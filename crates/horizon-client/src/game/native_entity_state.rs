@@ -4,7 +4,11 @@
 //! Players and mobs have them all; the other kinds have the ones Horizon
 //! keeps for them (an armor stand's fire and invisibility, an item's fire),
 //! and `None` for the rest, as for a stale handle or on a client.
-use super::{Game, commands::Target};
+use super::{
+    Game,
+    commands::Target,
+    native_player_state::{NativeEffect, instance},
+};
 use horizon_client::mobs::{Mob, Species, sync};
 use horizon_client::mod_api::EntityRef;
 use horizon_client::motion::PlayerMotion;
@@ -187,6 +191,27 @@ impl Game<'_> {
                 .map(|(name, ticks, amplifier)| ((*name).to_owned(), *ticks, *amplifier))
                 .collect(),
         )
+    }
+    /// Gives the mob `entity` `effect` as `LivingEntity.addEffect` and `/effect give` do: it
+    /// takes the place of a weaker or shorter one of the same kind, an omen's sound plays at the
+    /// mob's feet and a content mod's effect hears its start. Whether anything changed; false
+    /// also for what `native_add_effect` refuses, a player (that one takes them by UUID),
+    /// another kind, and a mob that is gone or dead.
+    pub(super) fn native_entity_add_effect(
+        &mut self,
+        entity: EntityRef,
+        effect: &NativeEffect,
+    ) -> bool {
+        let Some(effect) = instance(effect) else {
+            return false;
+        };
+        let Some(Target::Mob(id)) = self.native_entity_target(entity) else {
+            return false;
+        };
+        self.mobs
+            .iter()
+            .any(|m| m.id == id && !m.removed && m.alive())
+            && self.add_mob_effect(id, &effect)
     }
     /// Sets the base value of the mob `entity`'s attribute `attribute` (a name
     /// like `max_health` or `minecraft:max_health`), as
@@ -388,5 +413,60 @@ mod tests {
         assert!(around.contains(&id));
         let beside = game.native_entities_in(dim, [20.0, 60.0, 0.0], [36.0, 70.0, 16.0]);
         assert!(!beside.contains(&id));
+    }
+
+    /// `native_entity_add_effect` gives a mob an effect, and refuses what
+    /// `native_add_effect` refuses.
+    #[test]
+    #[ignore = "needs prepared resources in HORIZON_TEST_RESOURCES"]
+    fn an_effect_is_given_to_a_mob() {
+        let mut game = super::super::native_machines::tests::server_game();
+        game.native_lifecycle_open_started();
+        let id = game
+            .spawn_mob("minecraft:pig", [8.5, 65.0, 8.5], true)
+            .expect("a pig");
+        let pig = game.native_entity(id).expect("a handle");
+        let speed = |duration, amplifier| NativeEffect {
+            id: "minecraft:speed".into(),
+            amplifier,
+            duration,
+            ambient: false,
+            particles: true,
+        };
+        assert!(game.native_entity_add_effect(pig, &speed(200, 1)));
+        assert_eq!(
+            game.native_entity_effects(pig),
+            Some(vec![("minecraft:speed".to_owned(), 200, 1)])
+        );
+        // The same effect again changes nothing; a longer one replaces it.
+        assert!(!game.native_entity_add_effect(pig, &speed(100, 1)));
+        assert!(game.native_entity_add_effect(pig, &speed(400, 1)));
+        assert_eq!(
+            game.native_entity_effects(pig),
+            Some(vec![("minecraft:speed".to_owned(), 400, 1)])
+        );
+        // `/effect give` on a mob goes through the same code.
+        game.build_registries();
+        game.set_allow_commands(true);
+        assert!(
+            game.run_command("effect give @e[type=minecraft:pig,limit=1] minecraft:slowness 10 2")
+        );
+        assert_eq!(
+            game.native_entity_effects(pig).unwrap().last(),
+            Some(&("minecraft:slowness".to_owned(), 200, 2))
+        );
+        // An infinite one is -1; 0, below -1 and an unknown id are refused.
+        let infinite = NativeEffect {
+            id: "minecraft:glowing".into(),
+            ..speed(-1, 0)
+        };
+        assert!(game.native_entity_add_effect(pig, &infinite));
+        assert!(!game.native_entity_add_effect(pig, &speed(0, 0)));
+        assert!(!game.native_entity_add_effect(pig, &speed(-2, 0)));
+        let unknown = NativeEffect {
+            id: "minecraft:nothing".into(),
+            ..speed(100, 0)
+        };
+        assert!(!game.native_entity_add_effect(pig, &unknown));
     }
 }

@@ -4360,6 +4360,12 @@ a dimension.
   slot as `/item replace entity` does (None empties it; false where the entity has no such slot: a player has no body
   or saddle slot, while a mob has every slot, head and body apart; an air stack empties the slot). A mob's saddle can't be set yet, and a mob's off hand and
   body slot keep only the item, not the stack's count and components.
+- `entity.add_effect(host, effect)` gives a mob a `NativeEffect` (the type `native_add_effect` takes for a player) as
+  `LivingEntity.addEffect` does and `/effect give` does for a mob: it takes the place of a weaker or shorter effect of
+  the same kind, an omen's sound plays at the mob's feet and a content mod's effect hears its start. `duration` is in
+  ticks (`/effect give` rounds to seconds), -1 for an infinite one. False for an unknown effect, a duration of 0 or below
+  -1, a player (`native_add_effect` takes those by UUID), another kind, and a mob that is gone or dead; `entity.effects`
+  reads them back. No hook is needed.
 - `entity.nbt(host)` and `merge_nbt(host, compound)` read and change its data as `/data get` and `/data merge entity`
   do (merging works on mobs, dropped items, armor stands and item frames; never on players, as in vanilla);
   `tags`, `add_tag`, `remove_tag` work as `/tag` does, and `name` is its name as plain text.

@@ -43,6 +43,32 @@ impl Game<'_> {
             Ok(vec![self.implied(false)?])
         }
     }
+    /// `LivingEntity.addEffect` on the mob `id`, as `add_player_effect` does for the player: an
+    /// omen's sound at its feet and a content mod's effect hooks. Whether anything changed.
+    pub(in crate::game) fn add_mob_effect(&mut self, id: u32, effect: &EffectInstance) -> bool {
+        let Some(m) = self.mobs.iter_mut().find(|m| m.id == id) else {
+            return false;
+        };
+        let name = namespaced(effect.id);
+        let new = !m.has_effect(name);
+        let changed = m.add_effect_with(
+            name,
+            effect.duration,
+            effect.amplifier,
+            effect.ambient,
+            effect.visible,
+        );
+        // MobEffect.onEffectAdded: an omen's sound, at the mob's feet.
+        if new
+            && changed
+            && let Some(sound) = super::super::potions::sound_on_added(name)
+        {
+            let at = [m.position.x, m.position.y, m.position.z];
+            self.audio.play(sound, Some(at), 1.0, 1.0);
+        }
+        self.mod_effect_added(name, Some(id as i32), effect.amplifier, new);
+        changed
+    }
     /// `EffectCommands.giveEffect`.
     pub(super) fn cmd_effect_give(&mut self, ctx: &Context) -> R<i32> {
         let effect = Self::effect_arg(ctx)?;
@@ -61,36 +87,16 @@ impl Game<'_> {
             None if effect.instant => 1,
             None => 600,
         };
+        // `new MobEffectInstance(effect, duration, amplifier, false, particles)`.
+        let instance =
+            EffectInstance::new(effect.id, duration, amplifier).with_flags(false, particles);
         let mut tracker = Tracker::default();
         for t in self.living_targets(ctx)? {
             let changed = match t {
-                Target::Player | Target::Guest(_) => {
-                    // `new MobEffectInstance(effect, duration, amplifier, false, particles)`.
-                    let instance = EffectInstance::new(effect.id, duration, amplifier)
-                        .with_flags(false, particles);
-                    self.for_player(t, |g| g.add_player_effect(instance))
-                        .unwrap_or(false)
-                }
-                Target::Mob(id) => match self.mobs.iter_mut().find(|m| m.id == id) {
-                    Some(m) => {
-                        let name = namespaced(effect.id);
-                        let new = !m.has_effect(name);
-                        // `new MobEffectInstance(effect, duration, amplifier, false, particles)`.
-                        let changed =
-                            m.add_effect_with(name, duration, amplifier, false, particles);
-                        // MobEffect.onEffectAdded: an omen's sound, at the mob's feet.
-                        if new
-                            && changed
-                            && let Some(sound) = super::super::potions::sound_on_added(name)
-                        {
-                            let at = [m.position.x, m.position.y, m.position.z];
-                            self.audio.play(sound, Some(at), 1.0, 1.0);
-                        }
-                        self.mod_effect_added(name, Some(id as i32), amplifier, new);
-                        changed
-                    }
-                    None => false,
-                },
+                Target::Player | Target::Guest(_) => self
+                    .for_player(t, |g| g.add_player_effect(instance.clone()))
+                    .unwrap_or(false),
+                Target::Mob(id) => self.add_mob_effect(id, &instance),
                 _ => continue,
             };
             tracker.track(t, changed);

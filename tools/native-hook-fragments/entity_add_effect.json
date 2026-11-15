@@ -1,0 +1,8 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "entity_add_effect", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_add_effect", "receiver": "entity"}
+  ],
+  "rust_summary": "a status effect given to a mob (`native_entity_add_effect`).",
+  "doc_summary": "`entity.add_effect(host, effect)` gives a mob a `NativeEffect` as `LivingEntity.addEffect` does, the way `native_add_effect` does for a player, without a `/effect give` command. Bundles need \"hooks\": @API:entity_add_effect@."
+}

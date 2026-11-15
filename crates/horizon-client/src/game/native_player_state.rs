@@ -58,7 +58,7 @@ pub struct NativeAttributeModifier {
 
 /// The game's effect for `effect`: None for an unknown id or a duration
 /// below -1 or 0.
-fn instance(effect: &NativeEffect) -> Option<EffectInstance> {
+pub(super) fn instance(effect: &NativeEffect) -> Option<EffectInstance> {
     let def = brewing::effect(&effect.id)?;
     if effect.duration == 0 || effect.duration < -1 {
         return None;
