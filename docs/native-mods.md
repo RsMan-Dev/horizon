@@ -5156,7 +5156,8 @@ stock client shows as a chest (`generic_9x1` to `generic_9x6`); nothing is insta
   is sent the menu, its inventory and its cursor as they were. `slot` counts the menu's own slots first, then the
   player's inventory below it: `native_menu_inventory_slot(size, slot)` gives the inventory slot (0..9 the hotbar).
 - `native_menu_closed(uuid, window)`: the player closed it, another menu opened, or the player left.
-- `native_player_stacks(uuid)`: the player's 36 inventory slots, to show copies or offer them.
+- `native_player_stacks(uuid)`: the player's 36 inventory slots, to show copies or offer them. The armour and the off
+  hand are not among them: `native_player_equipment(uuid, slot)` reads those.
 - `native_exchange_items(a, a_offer, b, b_offer)`: each offer is inventory slots, each with the exact stack it must
   still hold. Both offers leave their slots and go to the other player where they fit whole (onto matching stacks,
   then empty slots), or nothing moves and the error says why (an offer that changed, no room, a player gone or

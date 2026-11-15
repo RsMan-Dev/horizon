@@ -229,6 +229,7 @@ impl Game<'_> {
     }
     /// The player's 36 inventory slots (0..9 the hotbar), to show or offer
     /// them; None for a player not here, dead, or whose state is swapped in.
+    /// The armour and the off hand are not among them (`native_player_equipment`).
     pub(super) fn native_player_stacks(&self, uuid: u128) -> Option<Vec<Option<ItemStack>>> {
         let host = self.lan.as_ref()?;
         let g = host
