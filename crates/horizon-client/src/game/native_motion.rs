@@ -1,6 +1,7 @@
 //! The player's motion for mods (docs/native-mods.md, "A player's motion"): a push for the local player, on a
-//! client, and a player's creative flying speed, on a server.
+//! client, and on a server a player's creative flying speed and a velocity given to their client.
 use super::Game;
+use horizon_protocol::packets::play::{self, Clientbound as C};
 
 /// Each component of a push is clamped to this, in blocks a tick.
 const PUSH_MAX: f32 = 4.0;
@@ -62,7 +63,37 @@ impl Game<'_> {
         host.hub.set_flying_speed(conn, speed);
         true
     }
+    /// For a server mod: gives `player`'s client the velocity `velocity`, in blocks a tick, in place of the one it
+    /// has (`ClientboundSetEntityMotionPacket`, what vanilla sends for an explosion or a hit's knockback,
+    /// `ServerPlayer.hurtMarked`): a dash, a jump pad. The player's client moves itself, so the server only tells it.
+    /// The movement check knows its client was told, as it does of the server's own pushes. False for a player not on
+    /// this server, for a value that is not finite and on a client. Works from `native_server_tick` and the player's
+    /// own hooks, as `native_send`.
+    pub(super) fn native_player_set_velocity(&mut self, player: u128, velocity: [f64; 3]) -> bool {
+        if self.remote.is_some() || !velocity.iter().all(|v| v.is_finite()) {
+            return false;
+        }
+        // The id the player's client knows itself by: in their own hook the hub is out of `lan`.
+        let id = if self.lan_acting_uuid == Some(player) {
+            self.lan_acting_entity.map(|id| id as i32)
+        } else {
+            self.lan
+                .as_ref()
+                .and_then(|h| h.hub.guests.iter().find(|g| g.uuid == player && g.placed))
+                .map(|g| g.entity_id)
+        };
+        let Some(id) = id else {
+            return false;
+        };
+        self.native_send(
+            player,
+            C::SetEntityMotion(play::SetEntityMotion { id, velocity }),
+        )
+    }
 }
+
+#[cfg(test)]
+mod native_motion_tests;
 
 #[cfg(test)]
 mod motion_tests {

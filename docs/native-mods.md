@@ -4602,6 +4602,14 @@ it moves only what the player sees, not where they are or aim.
   (sprinting) a player flies more than 10 blocks a tick: anyone but the single-player owner then meets the server's
   moved-too-quickly check, which can send them back, as vanilla's does. It answers false for a player not on this server,
   on a client, and inside a player's hook (call it from a tick hook).
+- `native_player_set_velocity(player, [x, y, z])` (server) gives `player`'s client that velocity, in blocks a tick, in
+  place of the one it has: a dash, a jump pad, a knock-up, as vanilla's explosions and hits do it
+  (`ClientboundSetEntityMotionPacket`). Their client moves itself, and the server's movement check, which plays the
+  client's ticks again, is told of the push as it is of the server's own, so it does not take the launch for a speed
+  hack. `native_player_velocity` is not heard for it (that hook is the server's own pushes). The value is not clamped:
+  past a few blocks a tick the player outruns the chunks loading. It answers false for a player not on this server, for
+  a value that isn't finite and on a client, and works from `native_server_tick` and the player's own hooks, as
+  `native_send` does. `entity.set_velocity` still refuses a player.
 
 ### Health HUD rows a mod draws
 

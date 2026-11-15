@@ -1,0 +1,8 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "player_set_velocity", "target": "horizon_client::game::native_motion::Game<'_>::native_player_set_velocity"}
+  ],
+  "rust_summary": "a velocity given to a player's client (`native_player_set_velocity`).",
+  "doc_summary": "`native_player_set_velocity(player, velocity)` gives a player's client a velocity, as an explosion's knockback does (API @API:player_set_velocity@); the movement check hears it as it hears the server's own pushes."
+}
