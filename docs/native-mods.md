@@ -3479,6 +3479,11 @@ calls them without a mod.
   their file as `NeoForgeData`; an empty compound when there is none, and
   setting an empty one takes it away. Mods share it: keep your keys under your namespace.
   Bundles need `"hooks": 486`.
+- Helper **`native_item_cooldown(uuid, group) -> Option<f32>`** (`host.item_cooldown`): what is left of the item
+  cooldown `group` of a player, `ItemCooldowns.getCooldownPercent` without a partial tick: 1.0 when it starts, falling to
+  0.0 as it runs out, and 0.0 for a group with no cooldown running. `group` is the item's id (`minecraft:ender_pearl`)
+  or the `group` of its `use_cooldown` component. None for a player not reached. `native_player_item_cooldown` only
+  announces the start. The pending fragment assigns its API number at merge.
 
 #### Server hooks for plugin ports: Moving players and vehicles
 

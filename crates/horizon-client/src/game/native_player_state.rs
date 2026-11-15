@@ -231,6 +231,26 @@ impl Game<'_> {
         }
     }
 
+    /// What is left of the item cooldown `group` of the player `uuid`, from 1
+    /// when it starts to 0 when it has run out (`ItemCooldowns.getCooldownPercent`
+    /// without a partial tick): `group` is the item's id (`minecraft:ender_pearl`)
+    /// or the `group` of its `use_cooldown` component. 0 for a group with no
+    /// cooldown running; None for a player not reached.
+    pub(super) fn native_item_cooldown(&self, uuid: u128, group: &str) -> Option<f32> {
+        let cooldowns = match self.native_place(uuid)? {
+            Place::Acting => &self.cooldowns,
+            Place::Guest(i) => {
+                let host = self.lan.as_ref()?;
+                // A guest who has not had a turn yet has no record of play.
+                let Some(play) = host.play.get(&host.hub.guests[i].conn) else {
+                    return Some(0.0);
+                };
+                &play.cooldowns
+            }
+        };
+        Some(cooldowns.percent(group, 0.0))
+    }
+
     /// Sets what is given of the player `uuid`'s health, food (level 0 to 20,
     /// saturation, exhaustion) and experience (level, progress 0 to 1 toward
     /// the next, total points), as Bukkit's `setHealth`, `setFoodLevel`,
@@ -600,5 +620,131 @@ mod tests {
         let mut none = None;
         assert!(set_persistent_data(&mut none, data.clone()));
         assert_eq!(persistent_data(none.as_ref()), data);
+    }
+
+    /// A cooldown read by group for a guest outside their turn (from their
+    /// record in the hub) and for the acting player inside it (the cooldowns
+    /// swapped into the game, the hub out of reach); 0 for a group nothing
+    /// started, None for a player not reached.
+    #[test]
+    #[ignore = "needs prepared resources in HORIZON_TEST_RESOURCES"]
+    fn an_item_cooldown_reads_by_group_for_a_guest_and_the_acting_player() {
+        use crate::game::{Audio, Options, Progress, Settings, lan::LanSettings, load_resources};
+        use horizon_client::lan::{Joined, NetConfig, PlayerSender, guest::Guest, hub::HubConfig};
+        use horizon_client::motion::PlayerMotion;
+        use horizon_core::geometry::Vec3;
+        use horizon_protocol::packets::configuration::ClientInformation;
+        use std::sync::{Arc, atomic::AtomicI32, mpsc};
+        let root = std::path::PathBuf::from(
+            std::env::var_os("HORIZON_TEST_RESOURCES").expect("prepared resources required"),
+        );
+        let settings = Settings::default();
+        let loaded = load_resources(
+            root.clone(),
+            None,
+            &root,
+            &settings,
+            std::time::Instant::now(),
+            false,
+            true,
+            &Progress::new(),
+            &mut |_, _| unreachable!(),
+        )
+        .unwrap();
+        let mut options = Options::parse(std::iter::empty()).unwrap().unwrap();
+        options.resources = root.clone();
+        options.execution_role = crate::game::execution_role::ExecutionRole::IntegratedServer;
+        let mut game = Game::new(
+            &loaded.resources,
+            loaded.pack,
+            loaded.gui.unwrap(),
+            options,
+            settings,
+            Audio::silent(&root),
+            None,
+        )
+        .unwrap();
+        game.build_registries();
+        game.lan_host(
+            LanSettings {
+                port: 0,
+                guest_commands: false,
+                force_game_mode: false,
+            },
+            NetConfig::loopback(0, "item-cooldown-test".into(), 2),
+            HubConfig {
+                default_game_mode: 0,
+                guest_commands: false,
+                force_game_mode: false,
+                hardcore: false,
+                view_distance: 2,
+                simulation_distance: 2,
+                dimension: "minecraft:overworld".into(),
+                allow_flight: false,
+                seed: 0,
+                max_players: 2,
+                integrated: false,
+                levels: Default::default(),
+            },
+        )
+        .unwrap();
+        let (tx, _rx) = mpsc::channel();
+        let mut guest = Guest::new(
+            Joined {
+                conn: 2,
+                uuid: 7,
+                name: "Alex".into(),
+                properties: Vec::new(),
+                info: ClientInformation::new(2),
+                brand: "test".into(),
+                sender: PlayerSender::new(tx, Arc::default()),
+                latency: Arc::new(AtomicI32::new(0)),
+                address: "127.0.0.1:25565".parse().unwrap(),
+                expected: false,
+                configured: Default::default(),
+            },
+            2,
+            [4.5, 64.0, 4.5],
+            2,
+        );
+        guest.placed = true;
+        let mut host = game.lan.take().unwrap();
+        host.hub.guests.push(guest);
+        let pearl = "minecraft:ender_pearl";
+        game.lan = Some(host);
+        // Outside their turn: the guest's own record, none before their first turn.
+        assert_eq!(game.native_item_cooldown(7, pearl), Some(0.0));
+        game.lan
+            .as_mut()
+            .unwrap()
+            .play
+            .entry(2)
+            .or_default()
+            .cooldowns
+            .add(pearl.into(), 20);
+        assert_eq!(game.native_item_cooldown(7, pearl), Some(1.0));
+        assert_eq!(game.native_item_cooldown(7, "minecraft:shield"), Some(0.0));
+        assert_eq!(game.native_item_cooldown(8, pearl), None);
+        for _ in 0..5 {
+            game.lan
+                .as_mut()
+                .unwrap()
+                .play
+                .get_mut(&2)
+                .unwrap()
+                .cooldowns
+                .tick();
+        }
+        assert_eq!(game.native_item_cooldown(7, pearl), Some(0.75));
+        // Inside their turn the hub is out of reach and their cooldowns are the game's.
+        let host = game.lan.take();
+        game.player = Some(PlayerMotion::new(game.motion, Vec3::new(0.0, 70.0, 0.0)).unwrap());
+        game.lan_acting = Some(2);
+        game.lan_acting_uuid = Some(7);
+        assert_eq!(game.native_item_cooldown(7, pearl), Some(0.0));
+        game.cooldowns.add(pearl.into(), 20);
+        assert_eq!(game.native_item_cooldown(7, pearl), Some(1.0));
+        assert_eq!(game.native_item_cooldown(8, pearl), None);
+        game.lan = host;
     }
 }
