@@ -1554,6 +1554,18 @@ fn network_stack(
                 horizon_protocol::item::Component::Int(*max),
             ));
         }
+        // The stack's own glint decides `ItemStack.hasFoil` on the client too.
+        let glint = "minecraft:enchantment_glint_override";
+        if d.other(&format!("!{glint}")).is_some() {
+            stack
+                .removed
+                .push(horizon_protocol::item::component::ENCHANTMENT_GLINT_OVERRIDE);
+        } else if let Some(on) = d.other(glint).and_then(crate::item_data::component_bool) {
+            stack.added.push((
+                horizon_protocol::item::component::ENCHANTMENT_GLINT_OVERRIDE,
+                horizon_protocol::item::Component::Bool(on),
+            ));
+        }
         // Unbreakable is a unit component; clients need its presence for the
         // durability bar, tooltip and item model, including in single player.
         if d.other("minecraft:unbreakable").is_some() {
@@ -2250,6 +2262,37 @@ mod tests {
             assert_eq!(sent.removed, [kind]);
             assert!(sent.added.is_empty());
         }
+    }
+
+    /// `ItemStack.hasFoil` reads `enchantment_glint_override` on the client too:
+    /// both values and the removal marker reach it.
+    #[test]
+    fn the_glint_override_reaches_the_client() {
+        let sent = |tag: Option<(&str, Tag)>| {
+            let mut item = ItemStack::new("minecraft:diamond", 1);
+            if let Some((name, value)) = tag {
+                item.data_mut().other.push((name.into(), value));
+            }
+            stack_to_network(|_| 7, |_, _| None, &Some(item)).unwrap()
+        };
+        let kind = component::ENCHANTMENT_GLINT_OVERRIDE;
+        let glint = "minecraft:enchantment_glint_override";
+        assert_eq!(
+            sent(Some((glint, Tag::Byte(1)))).component(kind),
+            Some(&horizon_protocol::item::Component::Bool(true))
+        );
+        assert_eq!(
+            sent(Some((glint, Tag::Byte(0)))).component(kind),
+            Some(&horizon_protocol::item::Component::Bool(false))
+        );
+        let removed = sent(Some((
+            "!minecraft:enchantment_glint_override",
+            Tag::Byte(0),
+        )));
+        assert_eq!(removed.removed, [kind]);
+        assert!(removed.component(kind).is_none());
+        let plain = sent(None);
+        assert!(plain.component(kind).is_none() && plain.removed.is_empty());
     }
 
     #[test]
