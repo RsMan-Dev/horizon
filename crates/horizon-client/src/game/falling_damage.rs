@@ -393,13 +393,14 @@ impl Game<'_> {
         let Some(id) = self.health_resources.damage.id(kind) else {
             return;
         };
-        let (hurt, amount) = match self.hurt_player_equipment(id, amount, None, false, 0, None) {
-            Ok((outcome, actual)) => (outcome.hurt, actual),
-            Err(error) => {
-                log::warn!("falling block damage failed: {error}");
-                (false, amount)
-            }
-        };
+        let (hurt, amount) =
+            match self.hurt_player_equipment(id, amount, None, false, 0, None, None) {
+                Ok((outcome, actual)) => (outcome.hurt, actual),
+                Err(error) => {
+                    log::warn!("falling block damage failed: {error}");
+                    (false, amount)
+                }
+            };
         if hurt {
             // LivingEntity.hurtServer: ENTITY_HURT_PLAYER, the falling block
             // (`DamageSources.fallingBlock(this)` and the like) being both the

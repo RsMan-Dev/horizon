@@ -3831,6 +3831,17 @@ what it needs and acts in its next tick hook. Bukkit's damage modifier breakdown
 absorption as separate values) is not offered: the reductions are applied after this hook. Bundles need "hooks":
 531.
 
+`native_living_incoming_damage_v4(victim, victim_uuid, kind, attacker, attacker_uuid, direct, damage_type,
+source_position, victim_position, victim_view, amount, cancel)` is v3 with where the hit lands, for a mod that decides
+from the angle or the distance (a parry from the front, a shield that covers an arc, a refusal beyond a reach). It
+fires everywhere v3 does, right after it with the amount v3 left; change `amount` or set `cancel` as in v1.
+`source_position` is `DamageSource.getSourcePosition`: where the hit comes from (a melee attacker's, a projectile's or
+an explosion's position), none for a source with no place (starvation, drowning, `/kill`) and where the game passes
+none yet (a falling block, thorns on a player). `victim_position` is the victim's feet and `victim_view` its
+`getViewVector` as the hit arrives (a mob's head's; the ender dragon's is its yaw with a level pitch); a hit is from
+the front when `(source_position - victim_position) . victim_view` is positive. No `self`, like v1. Bundles need
+"hooks": @API:living_incoming_damage_v4@.
+
 `native_interact_entity_v2(entity, kind, hand, stack, cancel)` is `native_interact_entity` with the hand that clicks
 (`Hand::Main` or `Hand::Off`, NeoForge's `PlayerInteractEvent.EntityInteract.getHand`). It is asked right after the
 unchanged v1 hook, once per hand vanilla tries: the main hand first, the off hand only when the main hand's turn did

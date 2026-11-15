@@ -11,6 +11,8 @@ pub struct EquipmentHurt {
     blocking: Option<Blocking>,
     living_cause: bool,
     causing: i32,
+    /// The source's position, for the native damage hook.
+    origin: Option<[f64; 3]>,
     /// The attacker's weapon, for the armour fraction's `armor_effectiveness`.
     armor_weapon: Option<ArmorWeapon>,
     before: f32,
@@ -63,6 +65,7 @@ impl PlayerMotion {
             .damage
             .source::<()>(hit.source, None, None, None)
             .ok_or("unknown resident damage source")?;
+        let place = self.hurt_place(hit.origin);
         let h = &mut self.health;
         let mut environment = Environment {
             entity: self.entity_id,
@@ -88,6 +91,7 @@ impl PlayerMotion {
             totem: h.totem_ready,
             totem_fired: hit.totem_fired,
             canceled: hit.canceled,
+            place,
         };
         let mut combat = ServerPlayerCombat::new(
             &mut self.attributes,
@@ -116,6 +120,7 @@ impl PlayerMotion {
         blocking: Option<Blocking>,
         living_cause: bool,
         causing: i32,
+        origin: Option<[f64; 3]>,
         armor_weapon: Option<ArmorWeapon>,
     ) -> Result<EquipmentHurt> {
         let mut hit = EquipmentHurt {
@@ -125,6 +130,7 @@ impl PlayerMotion {
             blocking,
             living_cause,
             causing,
+            origin,
             armor_weapon,
             before: self.health.health() + self.health.absorption(),
             fire_ticks: self.fire_ticks,

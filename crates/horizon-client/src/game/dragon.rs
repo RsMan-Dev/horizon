@@ -716,7 +716,13 @@ impl Dragon {
         // reallyHurt: LivingEntity.hurtServer, past its guards: a native mod's
         // hook. A canceled hit still returns true.
         let hurting = horizon_client::health::Hurting::Dragon(self.id as i32, source);
-        if horizon_client::health::hurt_server_canceled(hurting, &mut damage) {
+        let place = horizon_client::health::HurtPlace {
+            source: from.map(|from| [from.x, from.y, from.z]),
+            position: [self.position.x, self.position.y, self.position.z],
+            yaw: self.yaw,
+            pitch: 0.0,
+        };
+        if horizon_client::health::hurt_server_canceled(hurting, place, &mut damage) {
             return Hurt::Landed { full: false };
         }
         if damage < 0.0 {
@@ -5282,6 +5288,9 @@ mod tests {
     /// causing and direct entities, amount.
     type Seen = (String, i32, i32, f32);
     static SEEN: std::sync::Mutex<Vec<(i32, Seen)>> = std::sync::Mutex::new(Vec::new());
+    /// Where those hits landed, by entity.
+    static PLACES: std::sync::Mutex<Vec<(i32, horizon_client::health::HurtPlace)>> =
+        std::sync::Mutex::new(Vec::new());
     fn seen(entity: i32) -> Vec<Seen> {
         let seen = SEEN.lock().unwrap();
         seen.iter()
@@ -5294,13 +5303,14 @@ mod tests {
     /// 9003's -5 and 9004's NaN. `HURT_SERVER` is global, so it stays set for
     /// every test of the process; the other tests' dragons are entity 0.
     fn set_hook() {
-        use horizon_client::health::{HURT_SERVER, Hurting};
-        fn hook(hurting: Hurting<'_>, amount: &mut f32) -> bool {
+        use horizon_client::health::{HURT_SERVER, HurtPlace, Hurting};
+        fn hook(hurting: Hurting<'_>, place: HurtPlace, amount: &mut f32) -> bool {
             let Hurting::Dragon(entity @ 9001..=9005, s) = hurting else {
                 return false;
             };
             let hit = (s.damage_type.to_owned(), s.causing, s.direct, *amount);
             SEEN.lock().unwrap().push((entity, hit));
+            PLACES.lock().unwrap().push((entity, place));
             match entity {
                 9002 => *amount *= 2.0,
                 9003 => *amount = -5.0,
@@ -5310,7 +5320,7 @@ mod tests {
             entity == 9001
         }
         let installed = *HURT_SERVER.get_or_init(|| hook);
-        let ours: fn(Hurting<'_>, &mut f32) -> bool = hook;
+        let ours: fn(Hurting<'_>, HurtPlace, &mut f32) -> bool = hook;
         assert!(
             std::ptr::fn_addr_eq(installed, ours),
             "another native damage hook is set"
@@ -5334,8 +5344,18 @@ mod tests {
             causing: 12,
             direct: 0,
         };
-        let hurt = d.hurt(0, 9.0, Some(arrow), false);
+        let hurt = d.hurt_from(0, 9.0, Some(arrow), false, Some(Vec3::new(1.0, 2.0, 3.0)));
         assert_eq!(hurt, Hurt::Landed { full: false });
+        let place = PLACES
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|p| p.0 == 9001)
+            .unwrap()
+            .1;
+        assert_eq!(place.source, Some([1.0, 2.0, 3.0]));
+        assert_eq!(place.position, [0.0, 70.0, 0.0]);
+        assert_eq!((place.yaw, place.pitch), (d.yaw, 0.0));
         assert_eq!(seen(9001), [("minecraft:arrow".to_owned(), 12, 0, 9.0)]);
         assert_eq!(d.health, MAX_HEALTH);
         assert_eq!((d.invulnerable, d.last_hurt, d.hurt_time), (0, 0.0, 0));

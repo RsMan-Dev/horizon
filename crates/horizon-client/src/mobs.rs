@@ -3305,8 +3305,15 @@ impl Mob {
             amount = armadillo::reduce_damage(self, amount);
         }
         // LivingEntity.hurtServer, past its guards: a native mod's hook.
+        let place = crate::health::HurtPlace {
+            source: source.from,
+            position: [self.position.x, self.position.y, self.position.z],
+            yaw: self.head_yaw,
+            pitch: self.head_pitch,
+        };
         if crate::health::hurt_server_canceled(
             crate::health::Hurting::Mob(self, &source),
+            place,
             &mut amount,
         ) {
             // Ghast.hurtServer: true for a reflected fireball whatever

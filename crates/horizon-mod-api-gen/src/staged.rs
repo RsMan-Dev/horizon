@@ -38,6 +38,7 @@ const MOB_TURN: &[&str] = &[
     "living_incoming_damage",
     "living_incoming_damage_v2",
     "living_incoming_damage_v3",
+    "living_incoming_damage_v4",
     "living_damage_pre",
     "living_knockback",
     "living_knockback_v2",

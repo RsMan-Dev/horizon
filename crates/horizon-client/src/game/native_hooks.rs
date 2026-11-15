@@ -859,7 +859,7 @@ use horizon_client::{
     extras_hud::Corners,
     fast_hash::FxHashMap,
     first_person::Hand,
-    health::{HurtSource, Hurting, Knock},
+    health::{HurtPlace, HurtSource, Hurting, Knock},
     hud::{HudBatch, rgba},
     hud_layout::HealthHud,
     items::ItemStack,
@@ -7779,6 +7779,46 @@ impl Game<'_> {
             cancel,
         );
     }
+    /// `native_living_incoming_damage_v3` with where the hit lands, for a mod that decides from
+    /// the angle or the distance (a parry from the front, a refusal beyond a reach). The first
+    /// nine arguments are v3's. `source_position` is `DamageSource.getSourcePosition`: the
+    /// position the hit comes from (a melee attacker's, a projectile's, an explosion's centre),
+    /// none for a source with no place (starvation, drowning, `/kill`) and where the game passes
+    /// none yet (a falling block, thorns on a player). `victim_position` and `victim_view` are
+    /// the victim's feet and `getViewVector` as the hit arrives (the head's, for a mob; the ender
+    /// dragon's is its yaw with a level pitch). Fires right after v3, everywhere it fires, with the
+    /// amount v3 left; change `amount` or set `cancel` as in v1. A hit v1 or v3 canceled is not
+    /// asked. No `self`, like v1. It runs on the server thread. @API:living_incoming_damage_v4@.
+    pub(super) fn native_living_incoming_damage_v4(
+        victim: u32,
+        victim_uuid: Option<u128>,
+        kind: &str,
+        attacker: Option<u32>,
+        attacker_uuid: Option<u128>,
+        direct: Option<u32>,
+        damage_type: &str,
+        source_position: Option<[f64; 3]>,
+        victim_position: [f64; 3],
+        victim_view: [f64; 3],
+        amount: &mut f32,
+        cancel: &mut bool,
+    ) {
+        mod_api::dispatch_living_incoming_damage_v4(
+            mod_api::mods(),
+            victim,
+            victim_uuid,
+            kind,
+            attacker,
+            attacker_uuid,
+            direct,
+            damage_type,
+            source_position,
+            victim_position,
+            victim_view,
+            amount,
+            cancel,
+        );
+    }
     /// A menu with input slots a mod opened (`native_open_menu_with_input`)
     /// closed, for any reason: the player closed it, the server, a mod or
     /// another menu did, the player died or left. `slots` are its input
@@ -9731,7 +9771,7 @@ pub(super) fn block_contact(
 
 /// `native_living_incoming_damage` for the damage code (`health::HURT_SERVER`): whether
 /// it canceled the hit. Its one caller.
-pub(super) fn hurt_server(hurting: Hurting<'_>, amount: &mut f32) -> bool {
+pub(super) fn hurt_server(hurting: Hurting<'_>, place: HurtPlace, amount: &mut f32) -> bool {
     // Who the hit names, for v3: only while a native mod listens.
     let parties = if mod_api::mods().is_empty() {
         None
@@ -9781,6 +9821,20 @@ pub(super) fn hurt_server(hurting: Hurting<'_>, amount: &mut f32) -> bool {
             parties.attacker_uuid,
             parties.direct,
             damage_type,
+            amount,
+            &mut canceled,
+        );
+        Game::native_living_incoming_damage_v4(
+            entity as u32,
+            parties.victim_uuid,
+            kind,
+            parties.attacker,
+            parties.attacker_uuid,
+            parties.direct,
+            damage_type,
+            place.source,
+            place.position,
+            super::view_vector(place.yaw, place.pitch),
             amount,
             &mut canceled,
         );

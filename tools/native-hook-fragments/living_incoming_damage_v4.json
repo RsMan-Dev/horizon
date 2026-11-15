@@ -1,0 +1,17 @@
+{
+  "hooks": [
+    {
+      "name": "living_incoming_damage_v4",
+      "target": "horizon_client::game::native_hooks::Game<'_>::native_living_incoming_damage_v4",
+      "neoforge": "LivingIncomingDamageEvent",
+      "side": "server",
+      "cancellable": true,
+      "mod_api": {
+        "contract": "cancel",
+        "out": "cancel"
+      }
+    }
+  ],
+  "rust_summary": "damage everywhere v3 fires with the source's position and the victim's position and view (`native_living_incoming_damage_v4`).",
+  "doc_summary": "`native_living_incoming_damage_v4(victim, victim_uuid, kind, attacker, attacker_uuid, direct, damage_type, source_position, victim_position, victim_view, amount, cancel)`: `native_living_incoming_damage_v3` with where the hit comes from (none for a source with no place), and the victim's position and view vector, to decide a parry or a reach. Bundles need \"hooks\": @API:living_incoming_damage_v4@."
+}

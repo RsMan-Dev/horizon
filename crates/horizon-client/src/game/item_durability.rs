@@ -14,6 +14,7 @@ impl Game<'_> {
         blocking: Option<horizon_client::health::Blocking>,
         living_cause: bool,
         causing: i32,
+        origin: Option<[f64; 3]>,
         armor_weapon: Option<horizon_client::health::ArmorWeapon>,
     ) -> horizon_client::Result<(horizon_client::health::BlockOutcome, f32)> {
         let mut hit = self
@@ -28,6 +29,7 @@ impl Game<'_> {
                 blocking,
                 living_cause,
                 causing,
+                origin,
                 armor_weapon,
             )?;
         if let Some(damage) = hit.helmet_damage()
@@ -74,7 +76,7 @@ impl Game<'_> {
         p.velocity = before.add_vector(push);
         let canceled = source
             .and_then(|id| {
-                self.hurt_player_equipment(id, amount, None, false, 0, None)
+                self.hurt_player_equipment(id, amount, None, false, 0, None, None)
                     .ok()
             })
             .is_some_and(|(o, _)| o.canceled);

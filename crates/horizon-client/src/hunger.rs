@@ -3,7 +3,10 @@
 //! is mid-tick, preserving damage callbacks and the following timer reset.
 use crate::{
     Result,
-    health::{Attributes, Environment, HealthEvent, HealthResources, HealthRules, State, Updates},
+    health::{
+        Attributes, Environment, HealthEvent, HealthResources, HealthRules, HurtPlace, State,
+        Updates,
+    },
     motion::{MotionEvent, PlayerMotion},
 };
 use horizon_world::{
@@ -70,9 +73,11 @@ impl PlayerMotion {
         if self.client_side {
             return Ok(());
         }
+        let place = self.hurt_place(None);
         let h = &mut self.health;
         let mut world = TickWorld {
             entity: self.entity_id,
+            place,
             resources,
             rules,
             invulnerable: self.invulnerable || self.spectator,
@@ -94,6 +99,8 @@ impl PlayerMotion {
 }
 struct TickWorld<'a> {
     entity: i32,
+    /// Where the player stands, for the native damage hook of the starvation hurt.
+    place: HurtPlace,
     resources: &'a HealthResources,
     rules: HealthRules,
     invulnerable: bool,
@@ -199,6 +206,7 @@ impl FoodWorld for TickWorld<'_> {
             totem: false,
             totem_fired: false,
             canceled: false,
+            place: self.place,
         };
         if ServerPlayerCombat::new(self.attributes, self.data, food, self.ids, &mut environment)?
             .hurt(self.hurt, amount)?

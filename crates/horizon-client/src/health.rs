@@ -52,17 +52,29 @@ pub enum Hurting<'a> {
     /// An armor stand, by its entity id, for sweep knockback.
     ArmorStand(i32, HurtSource<'a>),
 }
+/// Where a hit lands, for [`HURT_SERVER`]: the victim's position and look as the hit
+/// arrives, and `DamageSource.getSourcePosition` (none for a source with no place:
+/// starvation, drowning, magic with no direct entity).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HurtPlace {
+    pub source: Option<[f64; 3]>,
+    pub position: [f64; 3],
+    pub yaw: f32,
+    pub pitch: f32,
+}
 /// The game's native damage hook (`native_living_incoming_damage`), set once by the
 /// game: `LivingEntity.hurtServer` once its guards passed. It may change the
 /// amount; true cancels the hit.
-pub static HURT_SERVER: OnceLock<fn(Hurting<'_>, &mut f32) -> bool> = OnceLock::new();
+pub static HURT_SERVER: OnceLock<fn(Hurting<'_>, HurtPlace, &mut f32) -> bool> = OnceLock::new();
 /// Whether [`HURT_SERVER`] canceled the hit (never while it is unset).
-pub fn hurt_server_canceled(hurting: Hurting<'_>, amount: &mut f32) -> bool {
+pub fn hurt_server_canceled(hurting: Hurting<'_>, place: HurtPlace, amount: &mut f32) -> bool {
     // A grouped mob turn: no mod hooks it (`native_client_hooks::Deferred`).
     if crate::native_client_hooks::deferring() {
         return false;
     }
-    HURT_SERVER.get().is_some_and(|hook| hook(hurting, amount))
+    HURT_SERVER
+        .get()
+        .is_some_and(|hook| hook(hurting, place, amount))
 }
 /// The game's `LivingDamageEvent.Pre` hook (`native_living_damage_pre`), set
 /// once by the game: `LivingEntity.actuallyHurt` once armour, enchantments,
@@ -490,6 +502,16 @@ impl PlayerHealth {
     }
 }
 impl PlayerMotion {
+    /// Where a hit with the source at `origin` lands on the player, for the native damage hook.
+    pub(crate) fn hurt_place(&self, origin: Option<[f64; 3]>) -> HurtPlace {
+        let p = self.position;
+        HurtPlace {
+            source: origin,
+            position: [p.x, p.y, p.z],
+            yaw: self.yaw,
+            pitch: self.pitch,
+        }
+    }
     pub fn hurt(
         &mut self,
         resources: &HealthResources,
@@ -509,12 +531,13 @@ impl PlayerMotion {
         amount: f32,
         blocking: Option<Blocking>,
     ) -> Result<BlockOutcome> {
-        self.hurt_caused_by(resources, rules, source, amount, blocking, false, 0)
+        self.hurt_caused_by(resources, rules, source, amount, blocking, false, 0, None)
     }
     /// `hurt_blocking` from a source whose causing entity is a living
     /// non-player (`living_cause`), which the `when_caused_by_living_non_player`
     /// damage types scale with the difficulty. `causing` is that entity's id
-    /// when it is known (0 otherwise), for the native damage hook.
+    /// when it is known (0 otherwise), and `origin` the source's position
+    /// (none for a source with no place), for the native damage hook.
     pub fn hurt_caused_by(
         &mut self,
         resources: &HealthResources,
@@ -524,6 +547,7 @@ impl PlayerMotion {
         blocking: Option<Blocking>,
         living_cause: bool,
         causing: i32,
+        origin: Option<[f64; 3]>,
     ) -> Result<BlockOutcome> {
         if self.client_side {
             return Ok(BlockOutcome::default());
@@ -537,6 +561,7 @@ impl PlayerMotion {
         let source_name = source.definition().name.clone();
         let totem_ready = self.health.totem_ready;
         let invulnerable = self.invulnerable;
+        let place = self.hurt_place(origin);
         let h = &mut self.health;
         let mut environment = Environment {
             entity: self.entity_id,
@@ -562,6 +587,7 @@ impl PlayerMotion {
             totem: totem_ready,
             totem_fired: false,
             canceled: false,
+            place,
         };
         let hurt = ServerPlayerCombat::new(
             &mut self.attributes,
@@ -688,6 +714,8 @@ pub(crate) struct Environment<'a> {
     pub(crate) totem_fired: bool,
     /// A native mod canceled the hit (`living_incoming_damage`).
     pub(crate) canceled: bool,
+    /// Where the hit lands, for the native damage hook.
+    pub(crate) place: HurtPlace,
 }
 /// `LivingEntity.applyItemBlocking` inputs for a raised `BlocksAttacks` item:
 /// reductions whose damage-type sets are already matched against the source.
@@ -1000,7 +1028,8 @@ impl HurtWorld for Environment<'_> {
     }
     fn hurt_start(&mut self, _: &mut State, damage: &mut f32) -> io::Result<bool> {
         let source = self.hurt_source();
-        let canceled = hurt_server_canceled(Hurting::Player(self.entity, source), damage);
+        let canceled =
+            hurt_server_canceled(Hurting::Player(self.entity, source), self.place, damage);
         self.canceled |= canceled;
         Ok(canceled)
     }
@@ -1270,7 +1299,7 @@ mod tests {
         };
         let id = health.damage.id("minecraft:mob_attack").unwrap();
         let o = player
-            .hurt_caused_by(health, rules, id, 4.0, Some(shield), true, 0)
+            .hurt_caused_by(health, rules, id, 4.0, Some(shield), true, 0, None)
             .unwrap();
         assert_eq!(o.blocked, 3.0, "Easy scales 4 to 3 before the shield");
         assert!(o.fully_blocked && !o.knockback);
@@ -1301,7 +1330,7 @@ mod tests {
             };
             let before = player.health.health();
             player
-                .hurt_caused_by(health, rules, id, 4.0, None, living, 0)
+                .hurt_caused_by(health, rules, id, 4.0, None, living, 0, None)
                 .unwrap();
             before - player.health.health()
         };
@@ -1339,12 +1368,15 @@ mod tests {
     /// What the hook of these tests saw: entity, damage type (a mob's kind)
     /// and causing entity, amount.
     static SEEN: std::sync::Mutex<Vec<(i32, String, f32)>> = std::sync::Mutex::new(Vec::new());
+    /// Where each of those hits landed, by entity.
+    static PLACES: std::sync::Mutex<Vec<(i32, super::HurtPlace)>> =
+        std::sync::Mutex::new(Vec::new());
     /// Sets the native damage hook of these tests (global: it stays set for
     /// the process): for entities 9001 to 9004 and 9011 to 9013 it records the
     /// hit, cancels x1's, doubles x2's, makes 9003's -5 and 9004's NaN.
     fn set_hook() -> fn(i32) -> Vec<(String, f32)> {
         use super::Hurting;
-        fn hook(hurting: Hurting<'_>, amount: &mut f32) -> bool {
+        fn hook(hurting: Hurting<'_>, place: super::HurtPlace, amount: &mut f32) -> bool {
             let (entity, seen) = match hurting {
                 Hurting::Player(e, s) | Hurting::Dragon(e, s) | Hurting::ArmorStand(e, s) => {
                     (e, format!("{} {}", s.damage_type, s.causing))
@@ -1355,6 +1387,7 @@ mod tests {
                 return false;
             }
             SEEN.lock().unwrap().push((entity, seen, *amount));
+            PLACES.lock().unwrap().push((entity, place));
             match entity {
                 9002 | 9012 => *amount *= 2.0,
                 9003 => *amount = -5.0,
@@ -1366,13 +1399,22 @@ mod tests {
         let installed = *super::HURT_SERVER.get_or_init(|| hook);
         assert!(std::ptr::fn_addr_eq(
             installed,
-            hook as fn(Hurting<'_>, &mut f32) -> bool
+            hook as fn(Hurting<'_>, super::HurtPlace, &mut f32) -> bool
         ));
         |entity| {
             let seen = SEEN.lock().unwrap();
             let hits = seen.iter().filter(|s| s.0 == entity);
             hits.map(|s| (s.1.clone(), s.2)).collect()
         }
+    }
+
+    /// Where the hook of `set_hook` was told entity `entity`'s hit landed.
+    fn place_of(entity: i32) -> super::HurtPlace {
+        let places = PLACES.lock().unwrap();
+        let mut hits = places.iter().filter(|p| p.0 == entity);
+        let place = hits.next().expect("the hook was not asked").1;
+        assert!(hits.next().is_none(), "asked more than once");
+        place
     }
 
     #[test]
@@ -1395,7 +1437,13 @@ mod tests {
         };
         // Canceled: no damage, cooldown, sound or knockback.
         let mut kept = mob(9001);
+        kept.position = horizon_core::geometry::Vec3::new(1.0, 2.0, 3.0);
+        (kept.head_yaw, kept.head_pitch) = (30.0, -10.0);
         assert!(!kept.damage(2.0, hit));
+        let place = place_of(9001);
+        assert_eq!(place.source, Some([3.0, 0.0, 0.0]));
+        assert_eq!(place.position, [1.0, 2.0, 3.0]);
+        assert_eq!((place.yaw, place.pitch), (30.0, -10.0));
         assert_eq!(
             (kept.health, kept.invulnerable, kept.hurt_time),
             (10.0, 0, 0)
@@ -1439,8 +1487,27 @@ mod tests {
         assert!(doubled.hurt(health, rules, id, 5.0).unwrap());
         assert_eq!(doubled.health.health(), 10.0);
         // The causing mob when it is known, else 0.
-        let hurt = player(9013).hurt_caused_by(health, rules, id, 5.0, None, false, 44);
+        let mut shot = player(9013);
+        shot.position = horizon_core::geometry::Vec3::new(4.0, 5.0, 6.0);
+        (shot.yaw, shot.pitch) = (90.0, 15.0);
+        let hurt = shot.hurt_caused_by(
+            health,
+            rules,
+            id,
+            5.0,
+            None,
+            false,
+            44,
+            Some([7.0, 8.0, 9.0]),
+        );
         assert!(hurt.unwrap().hurt);
+        // Where the arrow came from, and where and how the player stood.
+        let place = place_of(9013);
+        assert_eq!(place.source, Some([7.0, 8.0, 9.0]));
+        assert_eq!(place.position, [4.0, 5.0, 6.0]);
+        assert_eq!((place.yaw, place.pitch), (90.0, 15.0));
+        // A source with no place (starvation, drowning) names none.
+        assert_eq!(place_of(9011).source, None);
         assert_eq!(seen(9011), [("minecraft:arrow 0".to_owned(), 5.0)]);
         assert_eq!(seen(9013), [("minecraft:arrow 44".to_owned(), 5.0)]);
     }

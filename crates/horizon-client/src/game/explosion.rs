@@ -694,6 +694,7 @@ impl Game<'_> {
                     living_non_player,
                     // The blast's causing entity.
                     attacker.map_or(0, |(id, _)| *id as i32),
+                    Some(center),
                 )
             {
                 outcome = o;
