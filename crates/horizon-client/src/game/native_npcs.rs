@@ -7,7 +7,7 @@
 //! place: that level is put in place for the call, as `execute in` does, and
 //! the one that was is put back. A level nobody opened is not opened.
 use super::{Game, commands::Target, creatures::seen};
-use horizon_client::mobs::{Mob, MobWorld, Seen, Who, ai::do_hurt_target, goals::Cx};
+use horizon_client::mobs::{Mob, MobWorld, Seen, Who, ai, ai::do_hurt_target, goals::Cx};
 use horizon_world::nbt::{Compound, Tag};
 
 // Native mods use these; nothing in Horizon does.
@@ -342,21 +342,80 @@ impl Game<'_> {
         self.npc_in_level(dimension, |g| g.npc_mob_attack(mob, target))
             .unwrap_or(false)
     }
+    /// The connection of the server's player in play here whose entity id is `id`.
+    fn npc_guest(&self, id: u32) -> Option<u32> {
+        let h = self.lan.as_ref()?;
+        h.hub
+            .guests
+            .iter()
+            .find(|g| h.hub.here(g) && g.loaded && !g.dead && u32::try_from(g.entity_id) == Ok(id))
+            .map(|g| g.conn)
+    }
+    /// Gives mob `mob` of the loaded level `dimension` the target `target` (a living mob or a
+    /// server's player of the same level, by entity id), or none, as `Mob.setTarget` does: the
+    /// field its goals and species read, not an attack. The mob's own target goals may let go of
+    /// it on a later tick, as they do of one they chose, and what it does with it (chase, strike)
+    /// is its goals'. A player target is the player the mob sees from then on,
+    /// as for a guest it hunts. False for a level not loaded, no such living mob or target, the mob
+    /// itself, a target it never attacks (`Mob.canAttack`: a ghast, a creeper for an iron golem,
+    /// a player when it spares players), a creative or spectator player, a player while a guest's
+    /// packet is handled (the hub is taken out then), and a mob whose brain holds its target (a
+    /// breeze, a creaking, a warden, an axolotl). @API:mob_set_target@.
+    pub(super) fn native_mob_set_target(
+        &mut self,
+        dimension: &str,
+        mob: u32,
+        target: Option<u32>,
+    ) -> bool {
+        if target == Some(mob) {
+            return false;
+        }
+        self.npc_in_level(dimension, |g| g.npc_set_target(mob, target))
+            .unwrap_or(false)
+    }
+    /// `native_mob_set_target` in the level in place.
+    fn npc_set_target(&mut self, mob: u32, target: Option<u32>) -> bool {
+        let live = |m: &Mob, id: u32| m.id == id && !m.removed && m.alive();
+        let Some(i) = self.mobs.iter().position(|m| live(m, mob)) else {
+            return false;
+        };
+        if ai::target_in_brain(&self.mobs[i]) {
+            return false;
+        }
+        let Some(id) = target else {
+            self.mobs[i].ai.target = None;
+            return true;
+        };
+        let guest = self.npc_guest(id);
+        let (who, view) = match guest {
+            Some(conn) => match self.lan_guest_view(conn) {
+                Some(view) if !view.creative && !view.spectator => (Who::Player, Some(view)),
+                _ => return false,
+            },
+            None if self.mobs.iter().any(|m| live(m, id)) => (Who::Mob(id), None),
+            None => return false,
+        };
+        let uuid = self.level.player_uuid;
+        let snapshot: Vec<Seen> = self.mobs.iter().map(|m| seen(m, uuid)).collect();
+        let mut w = self.mob_world_base(&snapshot);
+        w.player = view.or(w.player);
+        if self.mobs[i].spares_target(&w, who) {
+            return false;
+        }
+        self.mobs[i].ai.target = Some(who);
+        // The player the mob sees is the one it targets (`LanHost::mob_players`).
+        if let (Some(conn), Some(host)) = (guest, self.lan.as_mut()) {
+            host.mob_players.insert(mob, conn);
+        }
+        true
+    }
     /// `native_mob_attack` in the level in place.
     fn npc_mob_attack(&mut self, mob: u32, target: u32) -> bool {
         let live = |m: &Mob, id: u32| m.id == id && !m.removed && m.alive();
         let Some(i) = self.mobs.iter().position(|m| live(m, mob)) else {
             return false;
         };
-        let guest = self.lan.as_ref().and_then(|h| {
-            h.hub
-                .guests
-                .iter()
-                .find(|g| {
-                    h.hub.here(g) && g.loaded && !g.dead && u32::try_from(g.entity_id) == Ok(target)
-                })
-                .map(|g| g.conn)
-        });
+        let guest = self.npc_guest(target);
         // The mob code sees one player (`Who::Player`): the guest hit, as in a
         // mob's tick that sees them.
         let (who, player) = match guest {
@@ -478,3 +537,6 @@ impl Game<'_> {
 #[cfg(test)]
 #[path = "native_lookup_tests.rs"]
 mod lookup_tests;
+#[cfg(test)]
+#[path = "native_mob_target_tests.rs"]
+mod target_tests;

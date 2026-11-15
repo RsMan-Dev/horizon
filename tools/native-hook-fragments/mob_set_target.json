@@ -1,0 +1,8 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "mob_set_target", "target": "horizon_client::game::native_npcs::Game<'_>::native_mob_set_target"}
+  ],
+  "rust_summary": "a target given to a mob (`native_mob_set_target`, `Mob.setTarget`).",
+  "doc_summary": "`native_mob_set_target(dimension, mob, target)` gives a mob a target, a living mob or a server's player by entity id, or none (`Mob.setTarget`). Bundles need \"hooks\": @API:mob_set_target@."
+}

@@ -477,6 +477,13 @@ pub fn register(m: &mut Mob) {
         m.ai.nav.can_float = true;
     }
 }
+/// Whether `m`'s attack target is its brain's: a breeze's and a creaking's and an axolotl's
+/// brain write `ai.target` from their memory each tick, and a warden's never reads it, so a
+/// target written by hand does not hold.
+pub fn target_in_brain(m: &Mob) -> bool {
+    super::monster_brain::has_brain(m.species())
+        || matches!(m.species(), Species::Axolotl | Species::Warden)
+}
 /// A new mob's goals (`Mob.registerGoals`): `mob.ai.goals` (vanilla's
 /// `goalSelector`) and `mob.ai.targets` (`targetSelector`) hold the goals of
 /// its species, which for a mod's type is its template's. Clear them to

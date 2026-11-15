@@ -3814,6 +3814,16 @@ that tick the other mobs of that level read as gone.
   vanilla, where the attack goal checks and swings first. True when the blow was dealt (whether it hurt, a shield or
   creative mode aside, is the damage hooks' to tell); false for no such living mob or target, the mob itself, and a
   player while a guest's packet is handled, where the hub is taken out. API 538.
+- **`native_mob_set_target(dimension, mob, target)`** gives a mob a target, as `Mob.setTarget` does, where
+  `native_mob_attack` makes one blow: `target` is a living mob or a server's player of the same level, by entity id, or
+  none to let go. It writes the field the mob's goals read, so what follows is theirs: a melee goal chases and strikes,
+  and the mob's own target goals may drop it later, as they drop one they chose. A player target is
+  the player the mob sees from then on. False for no such living mob or target, the mob itself, a target the mob never
+  attacks (`Mob.canAttack`: a ghast for any mob, a creeper for an iron golem, a player when it spares players), a
+  creative or spectator player, a player while a guest's packet is handled (the hub is taken out then), and a breeze,
+  a creaking, a warden or an axolotl, whose brain keeps the target. `native_living_change_target` can refuse or keep a
+  target but not replace it: a mod that wants another one cancels it and sets its own from its next tick. Bundles need
+  `"hooks": @API:mob_set_target@`.
 
 #### Server hooks for plugin ports: damage, hands, fishing and redstone
 
