@@ -4341,6 +4341,11 @@ a dimension.
 - `entity.velocity(host)` (a player's is the move its client last reported), `set_velocity(host, v)` (not for players,
   whose client moves them), `on_ground`, `bounding_box` (lowest and highest corner), `eye_height`, `eye_position`,
   `view_vector` and `distance_to_sqr(host, pos)` read and move it.
+- `entity.health(host)`, `max_health`, `is_baby`, `owner` (the UUID of the player a tamed mob belongs to), `no_gravity`,
+  `invulnerable` and `ticks_frozen` read a mob's state without `entity.nbt(host)`, which writes out the whole entity.
+  `health` leaves golden hearts out and `max_health` is the attribute with its modifiers; `is_baby` is false for a kind
+  with no baby, and `owner` is None for a mob nobody owns, whether or not the owner is on. They are None for a player
+  (the `native_player_*` reads take those by UUID), another kind, a mob that is gone and a stale handle. No hook is needed.
 - `level.block_state(host, pos)` (`minecraft:oak_stairs[facing=east,…]`, as `/setblock` takes it), `block` (the name
   alone), `block_property(host, pos, key)`, `is_loaded`, `height` (lowest `y` and height), `game_time` and `day_time`
   read any level the server has loaded, not only the one in place. A block in a chunk that isn't loaded reads as `None`.

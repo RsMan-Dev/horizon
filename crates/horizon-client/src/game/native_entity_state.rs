@@ -4,7 +4,7 @@
 //! Players and mobs have them all; the other kinds have the ones Horizon
 //! keeps for them (an armor stand's fire and invisibility, an item's fire),
 //! and `None` for the rest, as for a stale handle or on a client.
-use super::{Game, commands::Target};
+use super::{Game, commands::Target, native_entity_refs::uuid_from_words};
 use horizon_client::mobs::{Mob, Species, sync};
 use horizon_client::mod_api::EntityRef;
 use horizon_client::motion::PlayerMotion;
@@ -69,6 +69,56 @@ impl Game<'_> {
             Target::Mob(id) => Body::Mob(self.mobs.iter().find(|m| m.id == id)?),
             t => Body::Other(t),
         })
+    }
+    /// The mob a handle names, for the reads below: None for a player (the
+    /// `native_player_*` reads take those by UUID), another kind, a mob that
+    /// is gone and a stale handle.
+    fn native_entity_mob(&self, entity: EntityRef) -> Option<&Mob> {
+        match self.native_entity_body(entity)? {
+            Body::Mob(m) if !m.removed => Some(m),
+            _ => None,
+        }
+    }
+    /// The mob's health (`LivingEntity.getHealth`, golden hearts not
+    /// counted).
+    pub(super) fn native_entity_health(&self, entity: EntityRef) -> Option<f32> {
+        Some(self.native_entity_mob(entity)?.health)
+    }
+    /// The most health the mob holds (`LivingEntity.getMaxHealth`: its
+    /// `max_health` attribute with the modifiers on it).
+    pub(super) fn native_entity_max_health(&self, entity: EntityRef) -> Option<f32> {
+        Some(horizon_client::mobs::finalize::max_health(
+            self.native_entity_mob(entity)?,
+        ))
+    }
+    /// Whether the mob is a baby (`LivingEntity.isBaby`); false for a kind
+    /// that has no baby.
+    pub(super) fn native_entity_is_baby(&self, entity: EntityRef) -> Option<bool> {
+        Some(self.native_entity_mob(entity)?.is_baby())
+    }
+    /// The UUID of the player a tamed mob belongs to
+    /// (`OwnableEntity.getOwnerUUID`: a wolf, a cat...); None when it has
+    /// none, whether or not that player is on.
+    pub(super) fn native_entity_owner(&self, entity: EntityRef) -> Option<u128> {
+        self.native_entity_mob(entity)?
+            .extra
+            .owner
+            .map(uuid_from_words)
+    }
+    /// Whether gravity does not pull the mob (`Entity.isNoGravity`, its
+    /// `NoGravity` tag).
+    pub(super) fn native_entity_no_gravity(&self, entity: EntityRef) -> Option<bool> {
+        Some(self.native_entity_mob(entity)?.no_gravity)
+    }
+    /// Whether the mob takes no damage (`Entity.isInvulnerable`, its
+    /// `Invulnerable` tag, which `/kill` and the void still pass).
+    pub(super) fn native_entity_invulnerable(&self, entity: EntityRef) -> Option<bool> {
+        Some(self.native_entity_mob(entity)?.invulnerable_flag)
+    }
+    /// The ticks the mob has spent freezing (`Entity.getTicksFrozen`, its
+    /// `TicksFrozen` tag; 140 is fully frozen).
+    pub(super) fn native_entity_ticks_frozen(&self, entity: EntityRef) -> Option<i32> {
+        Some(self.native_entity_mob(entity)?.ticks_frozen)
     }
     /// Whether the player holds the sneak key (`Entity.isShiftKeyDown`);
     /// false for the other kinds. API 569.
@@ -388,5 +438,46 @@ mod tests {
         assert!(around.contains(&id));
         let beside = game.native_entities_in(dim, [20.0, 60.0, 0.0], [36.0, 70.0, 16.0]);
         assert!(!beside.contains(&id));
+    }
+
+    /// The state reads give a mob's own values, and `None` for a mob that is
+    /// gone.
+    #[test]
+    #[ignore = "needs prepared resources in HORIZON_TEST_RESOURCES"]
+    fn the_state_reads_give_the_mobs_values() {
+        let mut game = super::super::native_machines::tests::server_game();
+        game.native_lifecycle_open_started();
+        let id = game
+            .spawn_mob("minecraft:wolf", [8.5, 65.0, 8.5], true)
+            .expect("a wolf");
+        let wolf = game.native_entity(id).expect("a handle");
+        let owner = 0x0102_0304_0506_0708_090a_0b0c_0d0e_0f10_u128;
+        let m = game.mobs.iter_mut().find(|m| m.id == id).expect("in list");
+        m.health = 7.5;
+        m.extra.age = -100;
+        m.extra.owner = Some([0x0102_0304, 0x0506_0708, 0x090a_0b0c, 0x0d0e_0f10]);
+        m.no_gravity = true;
+        m.invulnerable_flag = true;
+        m.ticks_frozen = 90;
+        assert_eq!(game.native_entity_health(wolf), Some(7.5));
+        assert_eq!(game.native_entity_max_health(wolf), Some(8.0));
+        assert_eq!(game.native_entity_is_baby(wolf), Some(true));
+        assert_eq!(game.native_entity_owner(wolf), Some(owner));
+        assert_eq!(game.native_entity_no_gravity(wolf), Some(true));
+        assert_eq!(game.native_entity_invulnerable(wolf), Some(true));
+        assert_eq!(game.native_entity_ticks_frozen(wolf), Some(90));
+        let m = game.mobs.iter_mut().find(|m| m.id == id).expect("in list");
+        m.extra.age = 0;
+        m.extra.owner = None;
+        m.no_gravity = false;
+        assert_eq!(game.native_entity_is_baby(wolf), Some(false));
+        assert_eq!(game.native_entity_owner(wolf), None);
+        assert_eq!(game.native_entity_no_gravity(wolf), Some(false));
+        game.mobs
+            .iter_mut()
+            .find(|m| m.id == id)
+            .expect("in list")
+            .removed = true;
+        assert_eq!(game.native_entity_health(wolf), None);
     }
 }

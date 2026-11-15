@@ -207,7 +207,7 @@ impl Game<'_> {
 }
 
 /// A saved UUID's four ints (`UUIDUtil.uuidFromIntArray`) as one number.
-fn uuid_from_words(words: [i32; 4]) -> u128 {
+pub(super) fn uuid_from_words(words: [i32; 4]) -> u128 {
     words
         .iter()
         .fold(0, |uuid, w| (uuid << 32) | u128::from(*w as u32))

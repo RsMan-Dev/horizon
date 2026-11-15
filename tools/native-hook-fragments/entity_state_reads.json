@@ -1,0 +1,14 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "entity_health", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_health", "receiver": "entity"},
+    {"name": "entity_max_health", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_max_health", "receiver": "entity"},
+    {"name": "entity_is_baby", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_is_baby", "receiver": "entity"},
+    {"name": "entity_owner", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_owner", "receiver": "entity"},
+    {"name": "entity_no_gravity", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_no_gravity", "receiver": "entity"},
+    {"name": "entity_invulnerable", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_invulnerable", "receiver": "entity"},
+    {"name": "entity_ticks_frozen", "target": "horizon_client::game::native_entity_state::Game<'_>::native_entity_ticks_frozen", "receiver": "entity"}
+  ],
+  "rust_summary": "a mob's health, max health, baby, owner, no-gravity, invulnerable and frozen-tick reads without its NBT (`native_entity_health` and six more).",
+  "doc_summary": "`entity.health(host)`, `max_health`, `is_baby`, `owner`, `no_gravity`, `invulnerable` and `ticks_frozen` read a mob's state without `entity.nbt(host)`, which writes out the whole entity. Bundles need \"hooks\": @API:entity_state_reads@."
+}
