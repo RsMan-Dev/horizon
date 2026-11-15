@@ -8725,8 +8725,11 @@ impl Game<'_> {
     /// what it holds now. Once for each slot that changed, in that order,
     /// after the mobs' tick, so a mob that joins the level wearing something
     /// counts from empty on its first tick. It only hears: change the mob with
-    /// its own helpers. Players are heard by `native_on_equip`. Server-side.
-    /// API 148.
+    /// its own helpers. The players connected to the server are told too
+    /// (`kind` is `minecraft:player`; slots `mainhand`, the selected hotbar
+    /// slot, to `head`, never `body` or `saddle`), counting from empty on
+    /// their first tick and after a respawn; `native_on_equip` hears a
+    /// player's equipping as well. Server-side. API 148.
     pub(super) fn native_living_equipment_change(
         &mut self,
         entity: u32,
