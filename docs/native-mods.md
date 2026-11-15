@@ -3730,6 +3730,13 @@ injections before.
   so a field can go back to it. A display's `start_interpolation` is sent with it, so a changed transformation eases over
   `interpolation_duration`. `set` still sends every field. False when `id` isn't this viewer's client-side entity, when
   the viewer isn't on and inside a player's hook. No hook is needed.
+- Helper **`native_client_entity_set_passengers(viewer, vehicle, passengers) -> bool`** (`host.client_entity_set_passengers`):
+  `passengers` (ids of this viewer's client-side entities) become the whole of what `vehicle`, another of them, carries
+  on their client, as `ClientboundSetPassengersPacket` does: a rider sits where its vehicle puts it, and an empty list
+  dismounts them all. An entity the server tracks (a mob, a player) is not accepted as a vehicle or a passenger, so its
+  own riders are not touched. False, with nothing sent, when an id isn't this viewer's client-side entity, when
+  `vehicle` is in `passengers`, when an id repeats and when the viewer isn't on. The server keeps no record of who
+  rides what, so a loop (one on another, that one on the first) is not refused. No hook is needed.
 - Helper **`native_set_list_name(uuid, name)`** (`host.set_list_name`): styled text (colours, a rank prefix) for that
   player in everyone's Tab list in place of their nickname or name, as Bukkit's `Player.setPlayerListName`; None shows
   the nickname or name again. Only the Tab list (chat keeps `native_set_display_name`'s or the nickname). It is sent at

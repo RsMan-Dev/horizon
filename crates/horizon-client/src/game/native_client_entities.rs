@@ -53,6 +53,16 @@ fn entity_data(tag: &Tag) -> (Vec<Entry>, Vec<Entry>) {
     (meta, defaults)
 }
 
+/// Whether `passengers` can ride `vehicle`: every id is the viewer's own
+/// client-side entity (`owned`), `vehicle` is not among them and none repeats.
+fn passenger_list_ok(vehicle: i32, passengers: &[i32], owned: impl Fn(i32) -> bool) -> bool {
+    owned(vehicle)
+        && passengers
+            .iter()
+            .enumerate()
+            .all(|(i, id)| *id != vehicle && owned(*id) && !passengers[..i].contains(id))
+}
+
 /// An entity type's id with its namespace (`text_display` is
 /// `minecraft:text_display`).
 fn namespaced(kind: &str) -> String {
@@ -283,6 +293,33 @@ impl Game<'_> {
             || self.native_send(viewer, C::SetEntityData(play::SetEntityData { id, values }))
     }
 
+    /// Makes `passengers` the whole of what `vehicle` carries on `viewer`'s
+    /// client (`ClientboundSetPassengersPacket`: the list replaces the
+    /// vehicle's riders, an empty one dismounts them all). `vehicle` and every
+    /// passenger must be that viewer's client-side entities (an entity the
+    /// server tracks keeps its own riders). False, with nothing sent, when one
+    /// is not, when `vehicle` rides itself, when an id is listed twice, and
+    /// where the server is out of reach. The server keeps no record of who
+    /// rides what, so a loop (one on another, that one on the first) is not
+    /// refused.
+    pub(super) fn native_client_entity_set_passengers(
+        &mut self,
+        viewer: u128,
+        vehicle: i32,
+        passengers: &[i32],
+    ) -> bool {
+        let owned = |id: i32| self.native_client_entity_kind(viewer, id).is_some();
+        if !passenger_list_ok(vehicle, passengers, owned) {
+            return false;
+        }
+        let passengers = passengers.to_vec();
+        let packet = C::SetPassengers(play::SetPassengers {
+            vehicle,
+            passengers,
+        });
+        self.native_send(viewer, packet)
+    }
+
     /// Moves `viewer`'s client-side entity `id` to `pos` facing `yaw`
     /// (`ClientboundTeleportEntityPacket`, absolute; a display eases over its
     /// `teleport_duration`). False when it is not their client-side entity,
@@ -392,5 +429,19 @@ mod tests {
             )),
             [8]
         );
+    }
+
+    #[test]
+    fn passengers_are_the_viewers_own_entities_without_repeats_or_the_vehicle() {
+        let own = |id: i32| (1..=3).contains(&id);
+        assert!(passenger_list_ok(1, &[2, 3], own));
+        // An empty list dismounts everyone.
+        assert!(passenger_list_ok(1, &[], own));
+        // The vehicle must be theirs too, as each passenger.
+        assert!(!passenger_list_ok(9, &[2], own));
+        assert!(!passenger_list_ok(1, &[2, 9], own));
+        // Not itself, and no id twice.
+        assert!(!passenger_list_ok(1, &[1], own));
+        assert!(!passenger_list_ok(1, &[2, 2], own));
     }
 }

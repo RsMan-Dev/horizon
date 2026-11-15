@@ -1,0 +1,8 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "client_entity_set_passengers", "target": "horizon_client::game::native_client_entities::Game<'_>::native_client_entity_set_passengers"}
+  ],
+  "rust_summary": "which client-side entities ride another (`native_client_entity_set_passengers`).",
+  "doc_summary": "`native_client_entity_set_passengers(viewer, vehicle, passengers)` makes a list of a viewer's client-side entities (API 519) the riders of another, or none, the way `ClientboundSetPassengersPacket` does. Helper-only, no hook."
+}
