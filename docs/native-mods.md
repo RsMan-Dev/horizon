@@ -4344,6 +4344,11 @@ a dimension.
 - `level.block_state(host, pos)` (`minecraft:oak_stairs[facing=east,…]`, as `/setblock` takes it), `block` (the name
   alone), `block_property(host, pos, key)`, `is_loaded`, `height` (lowest `y` and height), `game_time` and `day_time`
   read any level the server has loaded, not only the one in place. A block in a chunk that isn't loaded reads as `None`.
+- `level.light(host, pos)` (`(block, sky)`, each 0 to 15, as `native_light`), `biome` (as `native_biome`) and
+  `block_collision(host, pos)` (the block's boxes, block-local, as `native_block_collision`) answer for the level the
+  handle names where those three answer for the level in place. They read `None` for a chunk that isn't loaded, and
+  `block_collision` also for a `y` outside the world, as the other reads here do; a loaded block with no collision gives
+  an empty list.
 - `level.seed(host)`, `difficulty` (`"normal"`, as `/difficulty` names it), `game_rule(host, "keep_inventory")` (a
   `GameRuleValue`, `Bool` or `Int`; None for an unknown rule), `weather` (rain and thunder levels, 0.0 to 1.0; both 0
   where the level has no weather), `is_raining` and `is_thundering` read its world settings.

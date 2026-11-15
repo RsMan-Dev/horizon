@@ -1,0 +1,10 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "level_light", "target": "horizon_client::game::native_level_refs::Game<'_>::native_level_light"},
+    {"name": "level_biome", "target": "horizon_client::game::native_level_refs::Game<'_>::native_level_biome"},
+    {"name": "level_block_collision", "target": "horizon_client::game::native_level_refs::Game<'_>::native_level_block_collision"}
+  ],
+  "rust_summary": "the light, biome and block collision of any open level (`native_level_light`, `native_level_biome`, `native_level_block_collision`).",
+  "doc_summary": "`native_level_light(level, pos)`, `native_level_biome(level, pos)` and `native_level_block_collision(level, pos)` read the light, the biome and the collision boxes of a block in the level a `LevelRef` names, where `native_light`, `native_biome` and `native_block_collision` read the level in place (API @API:level_reads@)."
+}

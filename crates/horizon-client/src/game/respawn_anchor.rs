@@ -13,6 +13,7 @@ use horizon_client::{
     mobs::Who,
     stand_up::{StandUpLevel, StandUpType, bed_forward, stand_up_fallback},
     text::Text,
+    world::World,
 };
 use horizon_core::{
     geometry::{Aabb, Axis, Vec3, VoxelShape},
@@ -383,10 +384,14 @@ impl Game<'_> {
     /// `BlockState.getCollisionShape(level, pos)`: the shape under the empty
     /// collision context.
     pub(super) fn block_collision_shape(&self, p: [i32; 3]) -> VoxelShape {
-        let state = self.world.block(p[0], p[1], p[2]);
+        self.block_collision_shape_in(&self.world, p)
+    }
+    /// The same in `world`, a level of this game.
+    pub(super) fn block_collision_shape_in(&self, world: &World, p: [i32; 3]) -> VoxelShape {
+        let state = world.block(p[0], p[1], p[2]);
         let binding = self.collision;
         let mut scene = SceneCollisions {
-            world: &self.world,
+            world,
             binding,
             subject: None,
         };

@@ -2,6 +2,7 @@
 //! filtering command sources, then run the final command once per source,
 //! reporting each result to the `store` callbacks of its source.
 use super::{Arg, Context, Dim, Game, R, Target, data::DataRef, err, wrap_degrees};
+use horizon_client::world::World;
 use horizon_client::{
     command::{CommandError, vanilla},
     nbt_path::NbtPath,
@@ -1264,7 +1265,11 @@ impl Game<'_> {
     }
     /// The biome name at a block position.
     pub(in crate::game) fn biome_name_at_block(&self, p: [i32; 3]) -> Option<String> {
-        let chunk = self.world.chunks.get(&(p[0] >> 4, p[2] >> 4))?;
+        self.biome_name_in(&self.world, p)
+    }
+    /// The biome name at a block position of `world`, a level of this game.
+    pub(in crate::game) fn biome_name_in(&self, world: &World, p: [i32; 3]) -> Option<String> {
+        let chunk = world.chunks.get(&(p[0] >> 4, p[2] >> 4))?;
         // The world's table (`world_biomes!`): a packed biome's id is past
         // the built-in list, and `Biomes::get` would clamp it to the last
         // vanilla one.
