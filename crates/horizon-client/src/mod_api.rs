@@ -1628,4 +1628,77 @@ mod tests {
             assert!(calls.lock().unwrap().is_empty());
         }
     }
+
+    /// Takes the grindstone's top input as the result, or clears a result of two sticks.
+    struct Grind;
+
+    impl Hooks for Grind {
+        fn prepare_grindstone_v2(
+            &self,
+            _host: &mut dyn Host,
+            event: &mut PrepareGrindstoneV2Event<'_>,
+        ) {
+            if event.second.is_some() {
+                *event.result = None;
+            } else {
+                *event.result = event.first.cloned();
+            }
+        }
+    }
+
+    /// Counts what the mod before it left in the result.
+    struct Counts(Arc<Mutex<Vec<Option<u32>>>>);
+
+    impl Hooks for Counts {
+        fn prepare_grindstone_v2(
+            &self,
+            _host: &mut dyn Host,
+            event: &mut PrepareGrindstoneV2Event<'_>,
+        ) {
+            self.0
+                .lock()
+                .unwrap()
+                .push(event.result.as_ref().map(|r| r.count));
+        }
+    }
+
+    #[test]
+    fn a_grindstone_result_is_set_changed_or_cleared_by_every_mod_in_turn() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mods = [
+            Box::new(Grind) as Box<dyn Hooks>,
+            Box::new(Counts(seen.clone())),
+        ];
+        let mut host = Reader {
+            block: "minecraft:grindstone",
+            lines: Vec::new(),
+        };
+        let (one, two) = (
+            stick(),
+            ItemStack {
+                count: 2,
+                ..stick()
+            },
+        );
+        let mut run = |first: Option<&ItemStack>, second: Option<&ItemStack>, vanilla| {
+            let mut result = vanilla;
+            dispatch_prepare_grindstone_v2(
+                &mut host,
+                &mods,
+                7,
+                "Probe",
+                [0; 3],
+                first,
+                second,
+                &mut result,
+            );
+            result
+        };
+        // An empty vanilla result is filled; one vanilla made is replaced; two inputs clear it.
+        assert_eq!(run(Some(&one), None, None), Some(one.clone()));
+        assert_eq!(run(Some(&two), None, Some(one.clone())), Some(two.clone()));
+        assert_eq!(run(Some(&one), Some(&two), Some(one.clone())), None);
+        // The second mod saw the first one's answer each time.
+        assert_eq!(*seen.lock().unwrap(), [Some(1), Some(2), None]);
+    }
 }

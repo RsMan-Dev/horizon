@@ -211,6 +211,8 @@ impl Game<'_> {
                 let (uuid, name) = (guest.uuid, guest.name.clone());
                 let mut result = gs.menu.slot(2).cloned();
                 self.native_prepare_grindstone(uuid, &name, gs.pos, &mut result);
+                let (first, second) = (gs.menu.slot(0), gs.menu.slot(1));
+                self.native_prepare_grindstone_v2(uuid, &name, gs.pos, first, second, &mut result);
                 let env = self.menu_env();
                 gs.menu.set_slot(&env, 2, result);
             }

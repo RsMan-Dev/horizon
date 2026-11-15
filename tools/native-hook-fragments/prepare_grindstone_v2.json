@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "name": "prepare_grindstone_v2",
+      "target": "horizon_client::game::native_hooks::Game<'_>::native_prepare_grindstone_v2",
+      "neoforge": "none (NeoForge has no such event)",
+      "side": "server",
+      "cancellable": false,
+      "mod_api": {"contract": "collect", "out": "result"}
+    }
+  ],
+  "rust_summary": "the grindstone's two input stacks with the prepared result (`native_prepare_grindstone_v2`).",
+  "doc_summary": "`native_prepare_grindstone_v2(player, name, pos, first, second, result)` (server) hands the mods the two stacks in a grindstone's input slots with the prepared result, which every mod may set, change or clear, where `native_prepare_grindstone` is only asked when there is none. Bundles need \"hooks\": @API:prepare_grindstone_v2@."
+}

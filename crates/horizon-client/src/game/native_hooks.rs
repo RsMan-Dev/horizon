@@ -6037,6 +6037,31 @@ impl Game<'_> {
     ) {
         mod_api::dispatch_prepare_grindstone(self, mod_api::mods(), player, name, pos, result);
     }
+    /// A grindstone result was prepared for a server player at `pos`, from the stacks in its two input
+    /// slots, `first` (the top) and `second` (the bottom), none for an empty slot. `result` is what the
+    /// grindstone offers now (none when the inputs give nothing) after `native_prepare_grindstone`: each mod is
+    /// called in turn and may set or change it, or clear it, before it is sent. Server-side. API
+    /// @API:prepare_grindstone_v2@.
+    pub(super) fn native_prepare_grindstone_v2(
+        &mut self,
+        player: u128,
+        name: &str,
+        pos: [i32; 3],
+        first: Option<&ItemStack>,
+        second: Option<&ItemStack>,
+        result: &mut Option<ItemStack>,
+    ) {
+        mod_api::dispatch_prepare_grindstone_v2(
+            self,
+            mod_api::mods(),
+            player,
+            name,
+            pos,
+            first,
+            second,
+            result,
+        );
+    }
     /// A smithing result was prepared for a server player at `pos`. Change it before it is sent. 292.
     pub(super) fn native_prepare_smithing(
         &mut self,
@@ -6468,7 +6493,7 @@ impl Game<'_> {
     /// A mob (`entity`, its `kind`) killed by a player is about to drop `xp`
     /// experience points, in total: `LivingEntity.dropExperience`, before the
     /// orbs are split and spawned. Change `xp`; zero or less drops no orbs.
-    /// Not asked for a mob that drops none. Server-side. Pending API
+    /// Not asked for a mob that drops none. Server-side. API
     /// 593.
     pub(super) fn native_living_experience_drop(&mut self, entity: u32, kind: &str, xp: &mut i32) {
         mod_api::dispatch_living_experience_drop(self, mod_api::mods(), entity, kind, xp);
@@ -6549,7 +6574,7 @@ impl Game<'_> {
 
     /// A thrown splash or lingering potion is about to apply its hit effects
     /// at `pos`. Set `cancel` to leave the effects and the cloud out, and
-    /// `native_potion_splash` is not told. Server-side. Pending API
+    /// `native_potion_splash` is not told. Server-side. API
     /// 597.
     pub(super) fn native_potion_splash_v2(&mut self, item: &str, pos: [f64; 3], cancel: &mut bool) {
         mod_api::dispatch_potion_splash_v2(self, mod_api::mods(), item, pos, cancel);
@@ -6619,7 +6644,7 @@ impl Game<'_> {
     /// A mob (`entity`, its `kind`) is about to change the block at `pos` from
     /// `from` to `to` (an enderman's block, a ravager's, a snow golem's, a
     /// wither's). Set `cancel` to leave the block as it is: nothing changes and
-    /// `native_entity_change_block` is not told. Server-side. Pending API
+    /// `native_entity_change_block` is not told. Server-side. API
     /// 588.
     pub(super) fn native_entity_change_block_v3(
         &mut self,
