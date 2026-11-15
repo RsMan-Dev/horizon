@@ -3724,6 +3724,10 @@ injections before.
   are this viewer's client-side entities and leaves other ids alone. `native_reserve_entity_id()` is an id from the
   server's own counter for a mod's own packets. Outside a player's hook; None or false there, when the viewer isn't on,
   for an unknown type and for an id that isn't theirs. Bundles need `"hooks": 519`.
+  When the player's client changes level (a dimension change, or a respawn into another dimension) it drops them
+  all, and the server drops the ids it kept for that viewer: `native_client_entity_set`, `_update`, `_move` and `_remove`
+  answer false for them from then on. Spawn them again if they are still wanted (`native_player_changed_dimension` tells
+  when). A respawn or a teleport into the dimension the player is already in keeps them.
 - Helper **`native_client_entity_update(viewer, id, nbt) -> bool`** (`host.client_entity_update`): `native_client_entity_set`
   for a few fields. It reads `nbt` as `set` does but sends only the data of the keys `nbt` has (`transformation` sends its
   four parts), and nothing for the others, which keep the value the client has; a key whose value is the default is sent,

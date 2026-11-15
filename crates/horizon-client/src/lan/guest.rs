@@ -251,7 +251,8 @@ pub struct Guest {
     pub tab_hidden: crate::fast_hash::FxHashSet<u128>,
     /// The entities a native mod showed this client alone
     /// (`native_client_entity_spawn`), by id, with their types: no level
-    /// holds them, and they go with the guest.
+    /// holds them, and they go with the guest, or with the client's level
+    /// when it changes ([`Guest::enter_level`]).
     pub client_entities: crate::fast_hash::FxHashMap<i32, String>,
     /// The client finished loading terrain (ServerboundPlayerLoadedPacket).
     pub loaded: bool,
@@ -754,6 +755,14 @@ impl Guest {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(change);
+    }
+    /// The client's level is `dimension` now. `ClientPacketListener.handleRespawn` keeps its level
+    /// for the same level key and replaces it otherwise, with the entities a mod showed it alone.
+    pub fn enter_level(&mut self, dimension: &str) {
+        if self.dimension != dimension {
+            self.client_entities.clear();
+            dimension.clone_into(&mut self.dimension);
+        }
     }
     /// `Entity.stopRiding`: out of the vehicle it rode.
     pub fn stop_riding(&mut self) {

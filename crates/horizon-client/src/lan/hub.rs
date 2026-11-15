@@ -4859,7 +4859,7 @@ impl Hub {
         self.close_container_for(i);
         let g = &mut self.guests[i];
         // PlayerList.respawn: into the level in place (the respawn level).
-        g.dimension = self.config.dimension.clone();
+        g.enter_level(&self.config.dimension);
         // restartClientLoadTimerAfterRespawn: the client loads a whole new level before it
         // reports it loaded.
         g.load_timeout = super::guest::CLIENT_LOADED_TIMEOUT;
@@ -4992,7 +4992,7 @@ impl Hub {
         let info = self.spawn_info(i, portal_cooldown, ctx.sea_level);
         self.close_container_for(i);
         let g = &mut self.guests[i];
-        g.dimension = self.config.dimension.clone();
+        g.enter_level(&self.config.dimension);
         // The load timer is not restarted: vanilla resets the client's loaded state on death and
         // respawn only, and covers a level change with its separate `isChangingDimension` term.
         g.tracker.clear();

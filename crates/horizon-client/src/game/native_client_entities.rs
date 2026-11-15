@@ -2,7 +2,8 @@
 //! (docs/native-mods.md, "Server hooks for plugin ports: vanish and per-viewer
 //! visuals"): a hologram or a board only its owner sees. No level holds them:
 //! they are never simulated, saved or tracked, nobody else sees them, and the
-//! client forgets them when its player changes dimension or leaves. Their
+//! client forgets them when its player changes dimension or leaves (the server
+//! forgets them then too: their ids are no longer the player's). Their
 //! synched data comes from a compound as `/summon` reads it.
 use super::Game;
 use horizon_client::lan::entity::EntityState;

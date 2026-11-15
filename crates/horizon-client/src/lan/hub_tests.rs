@@ -1730,3 +1730,55 @@ fn a_teleported_guests_tickets_stay_where_it_left_until_the_teleport_is_acked() 
     hub.guests[0].watching = false;
     assert_eq!(hub.guests[0].ticket_chunk(), left);
 }
+
+/// The entities a mod showed a client alone live in its level: a dimension change makes the client
+/// drop them, so the server must stop answering for their ids (`native_client_entity_*` say false
+/// for an id that is not the viewer's); a respawn in the same dimension keeps the client's level.
+#[test]
+fn a_guests_client_entities_go_with_the_clients_level() {
+    let (mut hub, _rx) = hub_with_a_guest();
+    let mut world = World::new(horizon_world::registry::BlockStateId(0), 0);
+    let mut next_entity = 2;
+    let border = crate::worldborder::WorldBorder::default();
+    let ctx = TickCtx {
+        sea_level: 63,
+        world: &mut world,
+        entities: &[],
+        next_entity: &mut next_entity,
+        spawn: [0.5, 64.0, 0.5],
+        spawn_angle: [0.0; 2],
+        difficulty: 2,
+        difficulty_locked: false,
+        clock_rate: 1.0,
+        tick_rate: 20.0,
+        tick_frozen: false,
+        tick_steps: Default::default(),
+        collision: None,
+        border: &border,
+        streaming: None,
+    };
+    let show = |hub: &mut Hub| {
+        hub.guests[0]
+            .client_entities
+            .insert(7, "minecraft:text_display".into());
+    };
+    show(&mut hub);
+    hub.respawn(0, [0.5, 64.0, 0.5], [0.0; 2], &ctx);
+    assert_eq!(
+        hub.guests[0].client_entities.len(),
+        1,
+        "respawn, same level"
+    );
+    hub.change_level(0, [100.5, 49.0, 0.5], 0.0, None, false, 0, &ctx);
+    assert_eq!(hub.guests[0].client_entities.len(), 1, "change, same level");
+    hub.set_dimension("minecraft:the_nether");
+    hub.change_level(0, [100.5, 49.0, 0.5], 0.0, None, false, 0, &ctx);
+    assert!(hub.guests[0].client_entities.is_empty(), "another level");
+    show(&mut hub);
+    hub.set_dimension("minecraft:overworld");
+    hub.respawn(0, [0.5, 64.0, 0.5], [0.0; 2], &ctx);
+    assert!(
+        hub.guests[0].client_entities.is_empty(),
+        "respawn, another level"
+    );
+}
