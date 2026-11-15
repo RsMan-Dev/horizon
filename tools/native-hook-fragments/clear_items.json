@@ -1,0 +1,9 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "clear_items", "target": "horizon_client::game::native_inventories::Game<'_>::native_clear_items"},
+    {"name": "clear_items_typed", "target": "horizon_client::game::native_inventories::Game<'_>::native_clear_items_typed"}
+  ],
+  "rust_summary": "up to a count of an item removed from a given player's inventory, whatever its components (`native_clear_items`).",
+  "doc_summary": "`native_clear_items(uuid, item, count)` removes up to `count` of an item id from a player's inventory, the armour and the off hand too, as `/clear` does, live or in their file, and returns how many (`native_clear_items_typed` Errs a `NativeInventoryError`)."
+}

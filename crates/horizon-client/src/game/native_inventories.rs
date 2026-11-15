@@ -194,6 +194,28 @@ fn heard_changed(heard: &mut Vec<Option<ItemStack>>, now: &[Option<&ItemStack>])
     !same
 }
 
+/// Removes up to `count` of `item` from `slots`, lowest slot first, whatever
+/// the stacks' components; a stack that empties leaves its slot empty.
+/// How many it removed.
+fn clear_items(slots: &mut [Option<ItemStack>], item: &str, count: u32) -> u32 {
+    let mut taken = 0;
+    for slot in slots.iter_mut() {
+        let Some(stack) = slot.as_mut().filter(|s| &*s.item == item) else {
+            continue;
+        };
+        let n = stack.count.min(count - taken);
+        stack.count -= n;
+        taken += n;
+        if stack.count == 0 {
+            *slot = None;
+        }
+        if taken == count {
+            break;
+        }
+    }
+    taken
+}
+
 fn level_slots(level: &Level, kind: NativeInventoryKind) -> Vec<Option<ItemStack>> {
     match kind {
         // Live only: never read from a file (`native_inventory_side_for`).
@@ -578,6 +600,25 @@ impl Game<'_> {
         Ok(taken)
     }
 
+    /// Removes up to `count` of `item` (`minecraft:diamond`, whatever its
+    /// damage, name or enchantments) from the player `uuid`'s `Player`
+    /// slots (the armour and the off hand too), lowest slot first, as
+    /// `/clear <player> <item> <count>` does for a bare item id, and returns
+    /// how many it removed. Live or in their file; a player's screen follows
+    /// with the tick's sync. Err as `native_inventory` (not inside a player's
+    /// turn: call it from `native_menu_clicked` or `native_server_tick`).
+    pub(super) fn native_clear_items_typed(
+        &mut self,
+        uuid: u128,
+        item: &str,
+        count: u32,
+    ) -> Result<u32, NativeInventoryError> {
+        let (taken, _) = self.native_edit_slots(uuid, NativeInventoryKind::Player, |s, _| {
+            Ok(clear_items(s, item, count))
+        })?;
+        Ok(taken)
+    }
+
     /// Edits the player `uuid`'s inventory `kind` (and, for `Player`, the
     /// held hotbar slot) live or in their file, as `native_inventory` reads
     /// it: nothing is written when `edit` fails. The guest's hub index when
@@ -733,6 +774,16 @@ impl Game<'_> {
         slots: &[(usize, ItemStack)],
     ) -> Result<Vec<ItemStack>, String> {
         self.native_take_stacks_typed(uuid, slots)
+            .map_err(|e| e.to_string())
+    }
+
+    pub(super) fn native_clear_items(
+        &mut self,
+        uuid: u128,
+        item: &str,
+        count: u32,
+    ) -> Result<u32, String> {
+        self.native_clear_items_typed(uuid, item, count)
             .map_err(|e| e.to_string())
     }
 }
@@ -949,6 +1000,32 @@ mod tests {
             damage: 0,
             extra: None,
         }
+    }
+
+    /// Items come out of the lowest slot first, whatever their components,
+    /// and only up to the count asked.
+    #[test]
+    fn clearing_takes_the_lowest_slots_first_whatever_the_components() {
+        let mut named = stack("minecraft:diamond", 3);
+        named.damage = 7;
+        let mut slots = vec![
+            Some(stack("minecraft:stick", 4)),
+            Some(named),
+            None,
+            Some(stack("minecraft:diamond", 5)),
+            Some(stack("minecraft:diamond", 2)),
+        ];
+        assert_eq!(clear_items(&mut slots, "minecraft:diamond", 6), 6);
+        assert_eq!(slots[1], None);
+        assert_eq!(slots[3].as_ref().map(|s| s.count), Some(2));
+        assert_eq!(slots[4].as_ref().map(|s| s.count), Some(2));
+        assert_eq!(slots[0], Some(stack("minecraft:stick", 4)));
+        // More than there is: all of it, and what it found.
+        assert_eq!(clear_items(&mut slots, "minecraft:diamond", 10), 4);
+        assert_eq!(slots[3], None);
+        assert_eq!(slots[4], None);
+        assert_eq!(clear_items(&mut slots, "minecraft:diamond", 0), 0);
+        assert_eq!(clear_items(&mut slots, "minecraft:gold_ingot", 1), 0);
     }
 
     /// `inventory_changed` is heard for a change only: an empty inventory

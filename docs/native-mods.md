@@ -3382,6 +3382,14 @@ tick later with a command.
   `expected`, and returns what was there (Bukkit's `setItem`); the second takes the stacks out of the given `Player`
   slots, each of which must still hold exactly its stack, all or none (a stake, a trade, a fine with enchanted gear).
   A player's screen follows with the tick's sync.
+- Helper `native_clear_items(uuid, item, count) -> Result<u32, String>` (`host.clear_items`): removes up to `count` of
+  `item` (`minecraft:diamond`) from a player's `Player` slots, the armour and the off hand too, lowest slot first,
+  whatever the stack's damage, name or enchantments, as `/clear <player> <item> <count>` does for a bare item id, and
+  returns how many it removed (less than `count` when the player carries less; the cursor and the crafting grid are
+  not touched). Checked and live or in the file like `native_take_stacks`, so Err inside a player's turn and for a
+  player who is logging in, dead or never seen here; where a mod must pick stacks by their components it lists
+  `native_inventory` and takes them with `native_take_stacks`. `native_clear_items_typed` Errs a
+  `NativeInventoryError`. No hook is needed.
 - **`native_player_inventory_changed(player, stacks)`**: a player's inventory changed, heard at the moment vanilla's
   `InventoryChangeTrigger` is checked (the per-tick check found another item or count in a slot), before any criterion
   is looked at and whether or not any advancement uses `inventory_changed`. `stacks` are the 41 slots in
