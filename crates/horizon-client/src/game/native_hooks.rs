@@ -817,7 +817,7 @@ use super::native_guards::{box_meets, finite, finite_params, mod_image_fits};
 use super::native_item_energy::ItemEnergyBuffer;
 use super::native_level_effects::{mod_particles_ok, mod_sound_ok, sound_id};
 use super::native_menus::viewer_changes;
-use super::native_world_edit::{property_change, with_property};
+use super::native_world_edit::{parse_block_state, property_change, with_property};
 use super::{
     Game, GameLevel, LevelDimension, Screen,
     execution_role::ExecutionRole,
@@ -10491,6 +10491,22 @@ impl Game<'_> {
     /// block. API 446.
     pub(super) fn native_default_state(&self, block: &str) -> Option<BlockStateId> {
         self.pack.assets.registry.default_state(block)
+    }
+    /// The block state `text` names, read as `/setblock` reads a block
+    /// (`BlockStateParser.parseForBlock`): `minecraft:oak_door[facing=east,open=true]`,
+    /// `minecraft:` when there is no namespace, the properties left out at
+    /// their defaults. None for text that doesn't read whole, an unknown block,
+    /// property or value, a tag and block entity data (`{...}`).
+    pub(super) fn native_block_state_from_string(&self, text: &str) -> Option<BlockStateId> {
+        parse_block_state(&self.ui.registries, self.pack.assets.registry, text)
+    }
+    /// `state` as text, every property in the block's order
+    /// (`minecraft:oak_door[facing=east,half=lower,...]`), what
+    /// `native_level_block_state` returns; `native_block_state_from_string`
+    /// reads it back. None for an unknown state.
+    pub(super) fn native_block_state_string(&self, state: BlockStateId) -> Option<String> {
+        self.pack.assets.registry.state(state)?;
+        Some(self.state_string(state))
     }
     /// The random of the server level `dimension`: vanilla's `Level.random`
     /// (`level.getRandom()`), the one its explosions, block drops and other

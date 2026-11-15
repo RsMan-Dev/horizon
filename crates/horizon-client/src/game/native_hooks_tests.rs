@@ -393,6 +393,58 @@ fn sound_ids_are_identifiers() {
     }
 }
 
+/// A block state read from text as `/setblock` reads it: the namespace and the
+/// default properties filled in, everything else refused.
+#[test]
+fn a_block_state_reads_from_text() {
+    let facts = br#"{"defaults":{"minecraft:air":0,"test:crop":1},"states":[
+            ["air",true,false,"","minecraft:air"],
+            ["crop0",false,false,"",{"id":"test:crop","properties":{"age":"0","lit":"false"}}],
+            ["crop1",false,false,"",{"id":"test:crop","properties":{"age":"1","lit":"false"}}],
+            ["crop0lit",false,false,"",{"id":"test:crop","properties":{"age":"0","lit":"true"}}],
+            ["crop1lit",false,false,"",{"id":"test:crop","properties":{"age":"1","lit":"true"}}]
+        ]}"#;
+    let registry = horizon_world::registry::BlockRegistry::from_facts_json(&facts[..]).unwrap();
+    use horizon_world::registry::BlockStateId;
+    let commands = horizon_client_core::registries::Registries {
+        blocks: [
+            ("minecraft:air".to_owned(), Vec::new()),
+            (
+                "test:crop".to_owned(),
+                vec![
+                    ("age".to_owned(), vec!["0".to_owned(), "1".to_owned()]),
+                    (
+                        "lit".to_owned(),
+                        vec!["false".to_owned(), "true".to_owned()],
+                    ),
+                ],
+            ),
+        ]
+        .into(),
+        ..Default::default()
+    };
+    let read = |text| super::parse_block_state(&commands, &registry, text);
+    assert_eq!(read("air"), Some(BlockStateId(0)));
+    assert_eq!(read("minecraft:air"), Some(BlockStateId(0)));
+    assert_eq!(read("test:crop"), Some(BlockStateId(1)));
+    assert_eq!(read("test:crop[age=1]"), Some(BlockStateId(2)));
+    assert_eq!(read("test:crop[lit=true,age=1]"), Some(BlockStateId(4)));
+    for refused in [
+        "",
+        "test:nothing",
+        "test:crop[age=9]",
+        "test:crop[height=1]",
+        "test:crop[age=1",
+        "test:crop[age=1]x",
+        "test:crop{Items:[]}",
+        "#minecraft:logs",
+        "test:crop test:crop",
+    ] {
+        assert_eq!(read(refused), None, "{refused:?}");
+    }
+    assert_eq!(read("test:crop[age=1,lit=true]"), Some(BlockStateId(4)));
+}
+
 /// A mod's property write: none for a key or value the block lacks, the
 /// state itself when it already has the value, else the new state.
 #[test]

@@ -1,0 +1,9 @@
+{
+  "hooks": [],
+  "helpers": [
+    {"name": "block_state_from_string", "target": "horizon_client::game::native_hooks::Game<'_>::native_block_state_from_string"},
+    {"name": "block_state_string", "target": "horizon_client::game::native_hooks::Game<'_>::native_block_state_string"}
+  ],
+  "rust_summary": "a block state read from and written as text, as `/setblock` takes it (`native_block_state_from_string`, `native_block_state_string`).",
+  "doc_summary": "`native_block_state_from_string(text)` reads `oak_door[facing=east,open=true]` as a block state (`BlockStateParser.parseForBlock`, without block entity data) and `native_block_state_string(state)` writes one as `BlockStateParser.serialize` does."
+}

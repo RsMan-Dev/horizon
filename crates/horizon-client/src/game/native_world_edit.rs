@@ -4,6 +4,9 @@ use super::{
     Game,
     native_claimed_items::{NativeHit, RAYCAST_MAX},
 };
+use horizon_client::command::{Reader, block};
+use horizon_client_core::registries::Registries;
+use horizon_world::chunk::BlockState;
 use horizon_world::nbt::Tag;
 use horizon_world::registry::{BlockRegistry, BlockStateId};
 
@@ -299,6 +302,29 @@ impl Game<'_> {
         self.block_entity_nbt(pos)
             .map(|tag| horizon_client::snbt::to_snbt(&tag))
     }
+}
+
+/// The block state `text` names, read as `/setblock` reads a block
+/// (`BlockStateParser.parseForBlock`): `oak_door[facing=east,open=true]`, the
+/// namespace `minecraft:` when it has none, the properties left out at their
+/// defaults. None for text that doesn't read whole, a block or property the
+/// game doesn't know, a value the property lacks, a tag and block entity data
+/// (`{...}`).
+pub(super) fn parse_block_state(
+    commands: &Registries,
+    registry: &BlockRegistry,
+    text: &str,
+) -> Option<BlockStateId> {
+    let mut reader = Reader::new(text);
+    let input = block::parse(&mut reader, commands, false).ok()?;
+    if reader.can_read() || input.nbt.is_some() {
+        return None;
+    }
+    let state = BlockState {
+        name: input.id,
+        properties: input.properties.into_iter().collect(),
+    };
+    registry.resolve(&state).ok()
 }
 
 /// `state` with its property `key` set to `value`; none when the block has
