@@ -883,7 +883,7 @@ use horizon_world::{
     consumable::UseAnimation,
     fluid::{FluidKind, FluidState},
     level::{BlockId, LevelAccess, PlacementContext, Ticks},
-    nbt::Compound,
+    nbt::{Compound, Tag},
     registry::BlockStateId,
 };
 use std::{
@@ -7593,6 +7593,21 @@ impl Game<'_> {
             status,
         );
     }
+    /// A player's client answered a dialog button whose action is `custom` (`ServerboundCustomClickActionPacket`,
+    /// vanilla's `ServerGamePacketListenerImpl.handleCustomClickAction`, which only logs it): `id` is the button's
+    /// identifier and `payload` the tag it carried, none when it had none. The client chose both, so a mod checks them
+    /// as it checks any text a player sends; the payload is at most 64 KiB. The player's state is swapped in, as for the
+    /// player's other packets. A sign's own `custom` click event is not heard, nor an answer given during the
+    /// configuration. It only hears. Server-side. API @API:custom_click_action@.
+    pub(super) fn native_custom_click_action(
+        &mut self,
+        player: u128,
+        name: &str,
+        id: &str,
+        payload: Option<&Tag>,
+    ) {
+        mod_api::dispatch_custom_click_action(self, mod_api::mods(), player, name, id, payload);
+    }
     /// A mob's target changed (NeoForge's `LivingChangeTargetEvent`, Bukkit's
     /// `EntityTargetEvent`, vanilla's `Mob.setTarget`): mob `entity` of type
     /// `kind` in `dimension` now targets the player `target` (a UUID) or the
@@ -12518,3 +12533,7 @@ fn mod_screen_opens(
 #[cfg(test)]
 #[path = "native_hooks_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_click_action_tests.rs"]
+mod native_click_action_tests;

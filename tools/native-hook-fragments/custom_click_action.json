@@ -1,0 +1,17 @@
+{
+  "hooks": [
+    {
+      "name": "custom_click_action",
+      "target": "horizon_client::game::native_hooks::Game<'_>::native_custom_click_action",
+      "neoforge": "none (NeoForge has no event for a dialog's custom click action; vanilla's handleCustomClickAction only logs it)",
+      "side": "server",
+      "cancellable": false,
+      "mod_api": {
+        "contract": "listen"
+      }
+    }
+  ],
+  "rust_summary": "a player's answer to a dialog button with a `custom` action (`native_custom_click_action`).",
+  "doc_summary": "`native_custom_click_action(player, name, id, payload)` (server) is heard when a player's client answers a dialog button whose action is `custom`: the button's id and its optional payload tag. Bundles need \"hooks\": @API:custom_click_action@.",
+  "comments": []
+}

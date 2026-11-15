@@ -3680,6 +3680,13 @@ What packet-level plugins (ProtocolLib, PacketEvents, TAB), plugin channel liste
   heard by v1, are heard here in order once the player has logged in, right after `native_player_logged_in`, with the
   hub in place; a player disconnected for declining a required pack never logs in. v1 keeps its signature and firing
   point. It only hears. Bundles need `"hooks": 544`.
+- **`native_custom_click_action(player, name, id, payload)`**: a player's client answered a dialog button whose action
+  is `custom` (`ServerboundCustomClickActionPacket`; vanilla's `handleCustomClickAction` only logs it). `id` is the
+  button's identifier and `payload` the tag it carried, `None` without one; with a dialog a mod opened itself, the
+  mod picks both and so tells its buttons apart without making them chat commands. The client chose them, so check
+  them as any text a player sends: the payload is at most 64 KiB and its shape is the player's. It is heard with the
+  player's state swapped in, as the player's other packets. A sign's `custom` click event and an answer given during
+  the configuration are not heard. It only hears. Bundles need `"hooks": @API:custom_click_action@`.
 - Helper **`native_kick(player, reason)`**: disconnects a player with `reason`, a whole `Text` in its colours and
   translations (Adventure's `Player.kick(Component)`; `/kick` takes one line of plain text), as `/kick` does: the
   client shows it, the log's "lost connection" line names it and `native_player_kicked` hears it. The kick happens at

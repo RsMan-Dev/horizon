@@ -2661,6 +2661,13 @@ impl Game<'_> {
             // STOP_RIDING_JUMP: AbstractHorse and Camel handleStopJump do
             // nothing, and a nautilus' dash is not stopped this way.
             S::PlayerCommand(p) if p.action == 4 => {}
+            // ServerboundCustomClickActionPacket: vanilla only logs it; the mods hear it.
+            S::CustomClickAction(p) => {
+                let (uuid, name) = (host.hub.guests[gi].uuid, host.hub.guests[gi].name.clone());
+                self.as_guest(host, conn, |g| {
+                    g.native_custom_click_action(uuid, &name, &p.id, p.payload.as_ref());
+                });
+            }
             // ServerboundResourcePackPacket in play: the server has nothing to
             // do with it (a declined required pack is handled on the connection).
             S::ResourcePack(r) => {
