@@ -834,7 +834,7 @@ mod tests {
     /// What a small frame costs by each path, for the pull request's numbers: run with
     /// `cargo test --release -p horizon-protocol --lib -- --ignored --nocapture frame_cost`.
     #[test]
-    #[ignore = "measure"]
+    #[ignore = "daily"]
     fn frame_cost() {
         let body = vec![0x2Fu8; 50];
         let n = 2_000_000;
