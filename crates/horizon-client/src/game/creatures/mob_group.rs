@@ -343,7 +343,7 @@ impl<M: MobSlot> Group<M> {
             others_grid: Some(&self.grid),
             others_index: Some(&self.index),
             others_villagers: Some(&self.villager_slots),
- species_slots: Some(&self.species_slots),
+            species_slots: Some(&self.species_slots),
             others_solid: Some(&self.solid_slots),
             difficulty,
             nearest_player,

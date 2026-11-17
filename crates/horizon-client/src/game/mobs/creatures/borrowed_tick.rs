@@ -300,7 +300,7 @@ impl Game<'_> {
                                     others_grid: Some(&grid),
                                     others_index: Some(&index),
                                     others_villagers: Some(&villager_slots),
- species_slots: Some(&species_slots),
+                                    species_slots: Some(&species_slots),
                                     others_solid: Some(&solid_slots),
                                     live_mobs: None,
                                     ..base.clone()
@@ -443,7 +443,7 @@ impl Game<'_> {
                         others_grid: Some(&grid),
                         others_index: Some(&index),
                         others_villagers: Some(&villager_slots),
- species_slots: Some(&species_slots),
+                        species_slots: Some(&species_slots),
                         others_solid: Some(&solid_slots),
                         difficulty,
                         nearest_player,
