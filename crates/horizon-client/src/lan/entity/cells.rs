@@ -105,10 +105,13 @@ fn mix(id: i32) -> u64 {
 impl Cells {
     pub(super) fn on(&self) -> bool {
         #[cfg(test)]
-        if self.off {
-            return false;
+        {
+            !self.off
         }
-        true
+        #[cfg(not(test))]
+        {
+            true
+        }
     }
 
     pub(super) fn stats(&self) -> &[Stat] {
