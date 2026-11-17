@@ -48,9 +48,7 @@ fn late_pairing_does_not_duplicate_or_spend_the_next_arrow_update() {
     assert_eq!(level.states.get(&37).unwrap().tick, 0);
     assert!(viewers[0].tracker.is_tracking(37));
     assert_eq!(
-        viewers[0]
-            .out
-            .iter()
+        crate::lan::Body::flatten(viewers[0].out.as_slice()).iter()
             .filter(|b| matches!(decode(b), play::Clientbound::AddEntity(_)))
             .count(),
         1
@@ -69,15 +67,11 @@ fn late_pairing_does_not_duplicate_or_spend_the_next_arrow_update() {
     assert_eq!(level.tick, 2);
     assert_eq!(level.states.get(&37).unwrap().tick, 1);
     assert!(
-        !viewers[0]
-            .out
-            .iter()
+        !crate::lan::Body::flatten(viewers[0].out.as_slice()).iter()
             .any(|b| matches!(decode(b), play::Clientbound::AddEntity(_)))
     );
     assert!(
-        viewers[0]
-            .out
-            .iter()
+        crate::lan::Body::flatten(viewers[0].out.as_slice()).iter()
             .any(|b| matches!(decode(b), play::Clientbound::SetEntityData(p)
         if p.id == 37 && p.values.contains(&(10, serializer::BOOLEAN, Value::Bool(true)))))
     );
@@ -126,9 +120,7 @@ fn late_pairing_keeps_chunk_range_and_own_entity_filters() {
             "x={x} chunk={held} own={own} scale={scale}"
         );
         assert_eq!(
-            viewers[0]
-                .out
-                .iter()
+            crate::lan::Body::flatten(viewers[0].out.as_slice()).iter()
                 .any(|b| matches!(decode(b), play::Clientbound::AddEntity(_))),
             expected
         );
