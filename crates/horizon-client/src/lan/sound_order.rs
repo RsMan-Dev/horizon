@@ -105,7 +105,9 @@ impl Hub {
             *packets = packets
                 .drain(..)
                 .flat_map(|b| match b {
-                    super::Body::Run(_) => b.packets().into_iter().map(|p| p.to_vec().into()).collect(),
+                    super::Body::Run(_) => {
+                        b.packets().into_iter().map(|p| p.to_vec().into()).collect()
+                    }
                     one => vec![one],
                 })
                 .collect();

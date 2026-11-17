@@ -957,25 +957,27 @@ mod tests {
     fn packets(count: usize) -> Vec<Vec<u8>> {
         use horizon_protocol::entity_data::{Value, serializer};
         use horizon_protocol::packets::play::{self, Clientbound as C};
-        [0usize, 1, 3, 20, 21, 22, 40, 60, 100, 300, 3000, 20_000, 2, 2, 7]
-            .iter()
-            .cycle()
-            .take(count)
-            .enumerate()
-            .map(|(i, &n)| match i % 4 {
-                // A packet every release has, small.
-                3 => C::RotateHead(play::RotateHead {
-                    id: i as i32,
-                    head_yaw: i as i8,
-                })
-                .encode(),
-                _ => C::SetEntityData(play::SetEntityData {
-                    id: i as i32,
-                    values: vec![(0, serializer::BYTE, Value::Byte(i as i8)); n],
-                })
-                .encode(),
+        [
+            0usize, 1, 3, 20, 21, 22, 40, 60, 100, 300, 3000, 20_000, 2, 2, 7,
+        ]
+        .iter()
+        .cycle()
+        .take(count)
+        .enumerate()
+        .map(|(i, &n)| match i % 4 {
+            // A packet every release has, small.
+            3 => C::RotateHead(play::RotateHead {
+                id: i as i32,
+                head_yaw: i as i8,
             })
-            .collect()
+            .encode(),
+            _ => C::SetEntityData(play::SetEntityData {
+                id: i as i32,
+                values: vec![(0, serializer::BYTE, Value::Byte(i as i8)); n],
+            })
+            .encode(),
+        })
+        .collect()
     }
 
     /// Everything a connection writes for `queue`, until it closes: the bytes on the wire.
@@ -1049,8 +1051,14 @@ mod tests {
                             all
                         })
                     };
-                    let what = format!("older {older:?}, compression {compression:?}, encrypted {encrypted}");
-                    assert!(by_bodies.len() > 100, "{what}: the packets were written ({})", by_bodies.len());
+                    let what = format!(
+                        "older {older:?}, compression {compression:?}, encrypted {encrypted}"
+                    );
+                    assert!(
+                        by_bodies.len() > 100,
+                        "{what}: the packets were written ({})",
+                        by_bodies.len()
+                    );
                     // Four connections at once, one buffer: the same bytes each.
                     let four: Vec<Vec<u8>> = std::thread::scope(|scope| {
                         let handles: Vec<_> = (0..4).map(|_| scope.spawn(by_runs)).collect();

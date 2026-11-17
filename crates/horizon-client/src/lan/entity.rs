@@ -1629,7 +1629,6 @@ impl Entities {
             }
         }
     }
-
 }
 
 #[cfg(test)]

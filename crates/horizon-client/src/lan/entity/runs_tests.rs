@@ -179,7 +179,12 @@ fn ranges_hold_the_packets_bodies_did() {
             let events = |trackers: &mut Vec<Tracker>| -> Vec<Vec<(bool, i32)>> {
                 trackers
                     .iter_mut()
-                    .map(|t| t.take_events().iter().map(|e| (e.start, e.entity)).collect())
+                    .map(|t| {
+                        t.take_events()
+                            .iter()
+                            .map(|e| (e.start, e.entity))
+                            .collect()
+                    })
                     .collect()
             };
             let [first, second] = &mut trackers;
@@ -199,7 +204,10 @@ fn ranges_hold_the_packets_bodies_did() {
             }
         }
     }
-    assert!(compared > 5_000, "the clients were sent their entities ({compared})");
+    assert!(
+        compared > 5_000,
+        "the clients were sent their entities ({compared})"
+    );
     assert!(
         runs > 100 && long_runs > 50,
         "clients were given ranges ({runs}, {long_runs} of several packets)"
