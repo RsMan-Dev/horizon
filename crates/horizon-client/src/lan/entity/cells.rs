@@ -20,7 +20,13 @@ use crate::fast_hash::FxHashMap;
 /// spectator is hidden. A player a native mod hid is shown only to players
 /// of at least its level.
 fn broadcast_to_player(v: &Viewer, p: &Probe) -> bool {
-    super::super::player_shown::player_shown(v.spectator, v.permission, p.spectator, p.watching, p.hidden)
+    super::super::player_shown::player_shown(
+        v.spectator,
+        v.permission,
+        p.spectator,
+        p.watching,
+        p.hidden,
+    )
 }
 
 /// TrackedEntity.updatePlayer: within the type's range (capped by the view
@@ -37,9 +43,11 @@ pub(super) fn sees(v: &Viewer, p: &Probe, chunks: &[(i32, i32)], held: &mut [u8]
             let (dx, dz) = (v.position[0] - p.x, v.position[2] - p.z);
             dx * dx + dz * dz <= range * range
         }
-        Some(areas) => {
-            super::super::viewed_levels::entities::in_reach(areas, chunks[p.chunk as usize], p.range)
-        }
+        Some(areas) => super::super::viewed_levels::entities::in_reach(
+            areas,
+            chunks[p.chunk as usize],
+            p.range,
+        ),
     };
     near && broadcast_to_player(v, p) && {
         let held = &mut held[p.chunk as usize];

@@ -939,7 +939,6 @@ struct Probe {
     hidden: Option<u8>,
 }
 
-
 /// One level's tracked entities (ChunkMap.entityMap).
 #[derive(Default)]
 pub struct Entities {
@@ -1726,9 +1725,9 @@ impl Entities {
     }
 }
 
+mod cells;
 #[cfg(test)]
 mod late_pair_tests;
-mod cells;
 use cells::sees;
 #[cfg(test)]
 mod cells_tests;
