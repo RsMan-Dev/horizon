@@ -83,5 +83,12 @@ fn check(
             });
         }
     }
-    C::decode(id, &packet.body).map_err(|_| Refusal::InvalidBody { index })
+    match C::decode(id, &packet.body).map_err(|_| Refusal::InvalidBody { index })? {
+        // An unmodeled packet keeps its opaque body; it has not been validated.
+        C::Unknown(..) => Err(Refusal::UnknownPacket {
+            index,
+            id: packet.id.clone(),
+        }),
+        checked => Ok(checked),
+    }
 }

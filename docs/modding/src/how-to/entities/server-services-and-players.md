@@ -97,8 +97,9 @@ name and that the body decodes completely, and no protocol type is part of the A
 packets) the client applies them all in the same frame, between two bundle delimiters. Nothing is applied on the server:
 what the client needs to read a packet (an entity it was sent, a registry entry) is the mod's to keep true. The whole
 list is checked before the first packet goes out, and a refusal sends none: `Client`, `Stale`, `NoConnection`,
-`UnknownPacket`, `InvalidBody`, `ServerOnly` (`bundle_delimiter` and `start_configuration`), `ProtectedPayload` (a custom
-payload on a channel a registered payload or an engine service owns) and `BundleTooLong` (over 4096). Prefer the typed
+`UnknownPacket` (an unknown name or a type without a body decoder), `InvalidBody`, `ServerOnly` (`bundle_delimiter` and
+`start_configuration`), `ProtectedPayload` (a custom payload on a channel a registered payload or an engine service owns)
+and `BundleTooLong` (over 4096). Prefer the typed
 calls (`tell`, `show_block`, `push_resource_pack`) where one exists.
 
 ## Player rules and sleep

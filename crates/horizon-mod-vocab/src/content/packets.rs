@@ -59,7 +59,8 @@ pub enum SendPacketsRefusal {
     Stale,
     /// The player has no connection to send to (a fake player).
     NoConnection,
-    /// The packet at `index` has no clientbound play packet of that type name.
+    /// The packet at `index` has no modeled clientbound play packet of that type name:
+    /// unknown names and types without a body decoder are both refused.
     UnknownPacket {
         /// Its position in the list.
         index: u32,

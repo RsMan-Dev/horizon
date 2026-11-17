@@ -110,6 +110,19 @@ fn each_send_refusal_has_its_own_name() {
             b.send_packets(game, &[foreign], false),
             Err(Refusal::UnknownPacket { index: 0, .. })
         ));
+        // The name exists, but Horizon has no codec for its body. Opaque
+        // `Clientbound::Unknown` is not a successfully validated packet.
+        let unmodeled = Packet::new(
+            Identifier::parse("minecraft:command_suggestions").unwrap(),
+            vec![],
+        );
+        assert_eq!(
+            b.send_packets(game, &[time(1), unmodeled.clone()], true),
+            Err(Refusal::UnknownPacket {
+                index: 1,
+                id: unmodeled.id,
+            })
+        );
         let mut cut = time(1);
         cut.body.pop();
         assert_eq!(
