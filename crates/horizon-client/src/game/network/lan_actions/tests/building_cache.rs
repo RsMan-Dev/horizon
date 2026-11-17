@@ -385,7 +385,7 @@ fn a_scenario_of_guests_hitting_pushing_and_teleporting_is_the_same_by_write_or_
 /// checks the cells against the guest list, guest by guest, and refreshes every cell) and by
 /// write: `cargo test --release -p horizon-client --lib -- --ignored --nocapture bodies_cost`.
 #[test]
-#[ignore = "measure"]
+#[ignore = "daily"]
 fn bodies_cost() {
     use horizon_client::lan::guest_list::GuestList;
     for n in [50u32, 100, 200, 400, 800] {
