@@ -9,10 +9,13 @@ impl Entities {
     /// Whether the tick's changes go out as ranges of one buffer.
     pub(super) fn send_runs(&self) -> bool {
         #[cfg(test)]
-        if self.runs_off {
-            return false;
+        {
+            !self.runs_off
         }
-        true
+        #[cfg(not(test))]
+        {
+            true
+        }
     }
 
     /// [`Self::send_two_phase`] on several threads, a body for each packet (the send benchmark).
