@@ -193,9 +193,14 @@ impl Game<'_> {
             };
             goals.stop_all(m, &mut cx);
             targets.stop_all(m, &mut cx);
+            // Registration also initializes species state. Run it on a detached
+            // copy so only the selectors replace state on the live mob.
+            let mut registration = m.clone();
+            mobs::ai::register(&mut registration);
+            mobs::part_goals::attach(&mut registration);
+            m.ai.goals = registration.ai.goals;
+            m.ai.targets = registration.ai.targets;
             m.ai.goals.disabled = goals.disabled;
-            mobs::ai::register(m);
-            mobs::part_goals::attach(m);
             mobs::apply_brain_events(&mut mobs, &mut level, &mut events, 0);
         }
         drop(w);
@@ -786,6 +791,20 @@ mod tests {
             assert_eq!(printed(game), fresh, "the mob has a new mob's goals");
             let stale = MobRef::new(EntityRef::new(WorldEpoch::new(999), 99));
             assert!(!stale.reset_goals(game));
+        });
+    }
+
+    #[test]
+    #[ignore = "daily"]
+    fn resetting_warden_goals_preserves_anger() {
+        with_game(|game| {
+            let handle = mob_in_game(game, "minecraft:warden", 99);
+            let uuid = [1, 2, 3, 4];
+            game.mobs[0].extra.warden.as_mut().unwrap().anger =
+                horizon_client::mobs::warden::AngerManagement::from_saved([(uuid, 90)]);
+            assert!(handle.reset_goals(game));
+            let anger: Vec<_> = game.mobs[0].extra.warden.as_ref().unwrap().anger.unloaded().collect();
+            assert_eq!(anger, vec![(uuid, 90)]);
         });
     }
 
