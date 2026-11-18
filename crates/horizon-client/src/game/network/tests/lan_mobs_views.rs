@@ -141,8 +141,18 @@ fn unseeded(body: &[u8]) -> &[u8] {
     }
 }
 
+fn host_equipment_and_effects(game: &Game<'_>) -> String {
+    format!(
+        "{:?} {:?} {:?} {:?}",
+        game.inventory, game.armor, game.offhand, game.potions.effects
+    )
+}
+
 /// Everything the turns may have changed, as text with the floats as bits.
 fn digest(game: &mut Game<'_>, received: &[(u32, Receiver<Out>)], blocks: &[[i32; 3]]) -> String {
+    let before = host_equipment_and_effects(game);
+    let views = game.lan_guest_views();
+    assert_eq!(host_equipment_and_effects(game), before);
     let mut text = String::new();
     let host = game.lan.as_ref().unwrap();
     for g in host.hub.guests.iter() {
@@ -181,7 +191,7 @@ fn digest(game: &mut Game<'_>, received: &[(u32, Receiver<Out>)], blocks: &[[i32
             .chain(g.armor.iter())
             .map(|s| s.as_ref().map(|s| (s.item.to_string(), s.count)))
             .collect();
-        let _ = write!(text, " inv={items:?}");
+        let _ = write!(text, " inv={items:?} offhand={:?}", g.offhand);
         if let Some(m) = g.motion.as_ref() {
             let _ = write!(
                 text,
@@ -215,7 +225,6 @@ fn digest(game: &mut Game<'_>, received: &[(u32, Receiver<Out>)], blocks: &[[i32
         }
         text.push('\n');
     }
-    // The mobs' views of the guests, as their turns give them.
     for b in blocks {
         let _ = writeln!(
             text,
@@ -224,7 +233,6 @@ fn digest(game: &mut Game<'_>, received: &[(u32, Receiver<Out>)], blocks: &[[i32
             game.world.block_entities.get(&(b[0], b[1], b[2]))
         );
     }
-    let views = game.lan_guest_views();
     let extra = EXTRA.with_borrow_mut(std::mem::take);
     let _ = write!(
         text,
@@ -497,6 +505,39 @@ fn difference(old: &[String], new: &[String]) -> Option<String> {
 
 fn path_of(run: &Run, tick: usize) -> Option<bool> {
     run.views[tick].iter().find(|v| v.0 == 2).map(|v| v.1)
+}
+
+#[test]
+#[ignore = "daily"]
+fn a_panicking_light_view_restores_the_host_and_guest() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    let mut resources = None;
+    let (mut game, _received) = game_of(&mut resources, &NAMES[..1]);
+    game.tick_guests();
+    game.offhand = Some(ItemStack::new("minecraft:torch", 1));
+    rec(&mut game, 2, |guest| {
+        guest.offhand = Some(ItemStack::new("minecraft:shield", 1));
+    });
+    let before = host_equipment_and_effects(&game);
+    let host_position = game.player.as_ref().unwrap().position;
+
+    VIEWS.with_borrow_mut(Vec::clear);
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        game.guest_player_view(2, |_| std::panic::panic_any("view panic"))
+    }));
+    assert_eq!(
+        result.unwrap_err().downcast_ref::<&str>(),
+        Some(&"view panic")
+    );
+    VIEWS.with_borrow(|views| assert_eq!(views.as_slice(), &[(2, true)]));
+    assert_eq!(host_equipment_and_effects(&game), before);
+    assert_eq!(game.player.as_ref().unwrap().position, host_position);
+    assert_eq!(game.lan_acting, None);
+    assert!(game.guest_combat.contains_key(&2));
+    let guest = game.lan.as_ref().unwrap().hub.guest(2).unwrap();
+    assert!(guest.motion.is_some());
+    assert_eq!(guest.offhand, Some(ItemStack::new("minecraft:shield", 1)));
 }
 
 #[test]

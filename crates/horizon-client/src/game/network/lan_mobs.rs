@@ -191,7 +191,7 @@ impl Game<'_> {
             .collect();
         let mut views = Vec::new();
         for (conn, uuid, moved) in conns {
-            if let Some(Some(v)) = self.guest_player_view(conn) {
+            if let Some(Some(v)) = self.guest_player_view(conn, Self::player_view) {
                 views.push((conn, guest_view(v, uuid, moved)));
             }
         }
@@ -205,13 +205,17 @@ impl Game<'_> {
     /// leaves to the turn what it would have done beyond them (a guest with a hurt direction,
     /// a teleport, events or a health that differs from its record, or no body yet, a nested
     /// or a fake one).
-    fn guest_player_view(&mut self, conn: u32) -> Option<Option<PlayerView>> {
+    fn guest_player_view(
+        &mut self,
+        conn: u32,
+        view: impl FnOnce(&Self) -> Option<PlayerView>,
+    ) -> Option<Option<PlayerView>> {
         #[cfg(test)]
         if FULL.get() {
-            return self.guest_view_in_a_turn(conn);
+            return self.guest_view_in_a_turn(conn, view);
         }
         if !gate(11, self.lan_acting.is_none()) || !gate(12, self.lan_guest_swaps.is_empty()) {
-            return self.guest_view_in_a_turn(conn);
+            return self.guest_view_in_a_turn(conn, view);
         }
         let host = self.lan.as_mut()?;
         let i = host.hub.guests.connection_index(conn)?;
@@ -231,7 +235,7 @@ impl Game<'_> {
                 })
         };
         if !light || !gate(10, self.guest_combat.contains_key(&conn)) {
-            return self.guest_view_in_a_turn(conn);
+            return self.guest_view_in_a_turn(conn, view);
         }
         #[cfg(test)]
         VIEWS.with_borrow_mut(|v| v.push((conn, true)));
@@ -289,7 +293,8 @@ impl Game<'_> {
             self.lan_acting_uuid.replace(uuid),
             std::mem::replace(&mut self.lan_acting_fake, false),
         );
-        let view = self.player_view();
+        // The view can call a native armor hook. Restore both players before unwinding.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| view(self)));
         (
             self.lan_acting,
             self.lan_acting_name,
@@ -306,7 +311,7 @@ impl Game<'_> {
         self.selected = selected;
         (self.yaw, self.pitch) = (yaw, pitch);
         std::mem::swap(&mut self.player, &mut body);
-        let host = self.lan.as_mut()?;
+        let host = self.lan.as_mut().expect("host was present for the view");
         host.hub.guests.update(i, |g| {
             std::mem::swap(&mut self.inventory, &mut g.inventory);
             std::mem::swap(&mut self.armor, &mut g.armor);
@@ -317,14 +322,21 @@ impl Game<'_> {
             m.sprinting = false;
             g.motion = Some(Box::new(m));
         });
-        Some(view)
+        match result {
+            Ok(view) => Some(view),
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     }
 
     /// The view through a turn of the guest: what every view was.
-    fn guest_view_in_a_turn(&mut self, conn: u32) -> Option<Option<PlayerView>> {
+    fn guest_view_in_a_turn(
+        &mut self,
+        conn: u32,
+        view: impl FnOnce(&Self) -> Option<PlayerView>,
+    ) -> Option<Option<PlayerView>> {
         #[cfg(test)]
         VIEWS.with_borrow_mut(|v| v.push((conn, false)));
-        self.as_guest(conn, |g| g.player_view())
+        self.as_guest(conn, |g| view(g))
     }
 
     /// The guest `conn`'s real identity — the uuid its lent view carries and
