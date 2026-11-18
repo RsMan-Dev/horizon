@@ -215,10 +215,13 @@ impl Game<'_> {
             };
             let mut recorded =
                 std::mem::take(&mut host.play.entry(conn).or_default().score_recorded);
-            let ran = self.guest_server_tick(conn, &mut |game| {
-                let sleeping = game.sleeping.is_some();
-                game.guest_tick_tail(sleeping, &mut recorded);
-            });
+            let ran = self.guest_server_tick_with_tail(
+                conn,
+                Some(&mut |game| {
+                    let sleeping = game.sleeping.is_some();
+                    game.guest_tick_tail(sleeping, &mut recorded);
+                }),
+            );
             if !ran {
                 let Some(host) = self.lan.as_mut() else {
                     return;

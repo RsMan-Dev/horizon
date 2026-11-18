@@ -61,18 +61,27 @@ impl Game<'_> {
     /// hazards (drowning, lava, fire blocks, suffocation, the void), and
     /// regeneration and the food tick (ServerPlayer.doTick). Their hurt
     /// sounds are heard at the guest.
-    pub(super) fn guest_server_tick(&mut self, conn: u32, tail: &mut dyn FnMut(&mut Self)) -> bool {
+    #[allow(dead_code)] // Retained as a native mod point.
+    pub(super) fn guest_server_tick(&mut self, conn: u32) {
+        self.guest_server_tick_with_tail(conn, None);
+    }
+
+    pub(super) fn guest_server_tick_with_tail(
+        &mut self,
+        conn: u32,
+        tail: Option<&mut dyn FnMut(&mut Self)>,
+    ) -> bool {
         let mut ran = false;
         self.guest_server_tick_inner(conn, tail, &mut ran);
         ran
     }
 
-    /// [`Self::guest_server_tick`]; `ran` says whether `tail` (the rest of the guest's tick, which
+    /// `ran` says whether `tail` (the rest of the guest's tick, which
     /// the caller would run in a turn of its own) ran in this tick's turn.
     fn guest_server_tick_inner(
         &mut self,
         conn: u32,
-        tail: &mut dyn FnMut(&mut Self),
+        tail: Option<&mut dyn FnMut(&mut Self)>,
         ran: &mut bool,
     ) {
         self.guest_replay(conn);
@@ -376,6 +385,7 @@ impl Game<'_> {
             #[cfg(not(test))]
             let allowed = true;
             if allowed
+                && let Some(tail) = tail
                 && gate(40, events.iter().all(inert))
                 && gate(41, velocity.is_none())
                 && gate(42, soul.is_none())

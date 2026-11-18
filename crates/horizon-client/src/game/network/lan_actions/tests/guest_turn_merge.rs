@@ -886,7 +886,7 @@ fn long_run(merge: bool, skip: u64) -> (Vec<String>, usize, usize) {
     let mut resources = None;
     let (mut game, received) = game_of(&mut resources, &NAMES);
     seeded(&mut game);
-    assert!(game.run_command("fill 17 99 0 21 99 6 water"));
+    assert!(game.run_command("fill 19 98 8 25 100 8 water"));
     let host = game.lan.as_mut().unwrap();
     host.hub.guests.update(3, |g| {
         g.position[1] = 112.0;
@@ -924,6 +924,7 @@ fn long_run(merge: bool, skip: u64) -> (Vec<String>, usize, usize) {
     ];
     let mut log = Vec::new();
     let (mut apart, mut together) = (0, 0);
+    let mut swimmer_touched_water = false;
     super::super::guest_body::TRACE.with_borrow_mut(Vec::clear);
     for tick in 0..60 {
         for &(at, command) in &script {
@@ -953,6 +954,14 @@ fn long_run(merge: bool, skip: u64) -> (Vec<String>, usize, usize) {
             walk(&mut game, 5, [0.0, -0.4, 0.0], false);
         }
         game.tick_guests();
+        swimmer_touched_water |= game
+            .lan
+            .as_ref()
+            .unwrap()
+            .hub
+            .guest(4)
+            .and_then(|guest| guest.motion.as_ref())
+            .is_some_and(|motion| motion.fluids.was_touching_water);
         log.push(digest(&mut game, &received, &[]));
     }
     super::super::guest_body::TRACE.with_borrow(|t| {
@@ -961,6 +970,10 @@ fn long_run(merge: bool, skip: u64) -> (Vec<String>, usize, usize) {
     });
     super::super::guest_body::NO_MERGE.set(false);
     super::super::guest_body::SKIP.set(0);
+    assert!(
+        swimmer_touched_water,
+        "Swimmer touched water during the run"
+    );
     (log, apart, together)
 }
 
