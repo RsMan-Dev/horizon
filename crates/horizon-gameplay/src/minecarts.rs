@@ -105,6 +105,8 @@ pub struct NearCarts {
     pub area: Aabb,
     pub boxes: Vec<Aabb>,
 }
+/// How far past a cart's box the boxes are taken when its tick begins (a longer move asks the list).
+pub const NEAR_CARTS_REACH: f64 = 8.0;
 impl NearCarts {
     /// The boxes that meet `near`, in list order; None when `near` is not inside the area taken.
     pub fn meeting(&self, near: Aabb) -> Option<Vec<Aabb>> {
@@ -291,6 +293,8 @@ pub fn forget_unreadable_display(
 /// unseen, so with mods loaded both scans stay.
 #[derive(Default)]
 pub struct CartIndex {
+    /// The tick pass over the carts shares a grid for the movement snapshots.
+    pub pass: bool,
     pub carts: Option<(SeenGrid, Vec<u32>)>,
     /// The grid, and the carts a mob rides.
     pub mobs: Option<(ListStamp, SeenGrid, FxHashSet<u32>)>,
@@ -323,7 +327,12 @@ impl CartIndex {
         if !Self::usable() {
             return false;
         }
-        let fresh = |ids: &[u32]| ids.len() == carts.len() && ids[i] == carts[i].id;
+        // Removing a cart and adding another at the end keeps the length.
+        let fresh = |ids: &[u32]| {
+            ids.len() == carts.len()
+                && ids[i] == carts[i].id
+                && ids.last() == carts.last().map(|c| &c.id)
+        };
         if !self.carts.as_ref().is_some_and(|(_, ids)| fresh(ids)) {
             self.carts = Some((
                 SeenGrid::new(carts.iter().map(Minecart::bounds)),
@@ -343,6 +352,26 @@ impl CartIndex {
             return false;
         }
         true
+    }
+    /// The boxes of the other carts that meet `area`, in list order, for the cart in slot `i`;
+    /// None: the cart asks the list itself.
+    pub fn near_snapshot(&mut self, carts: &[Minecart], i: usize, area: Aabb) -> Option<NearCarts> {
+        if !self.pass {
+            return None;
+        }
+        let mut slots = Vec::new();
+        if !self.carts_near(carts, i, area, &mut slots) {
+            return None;
+        }
+        let id = carts[i].id;
+        let boxes = slots
+            .iter()
+            .map(|&j| &carts[j as usize])
+            .filter(|o| o.id != id)
+            .map(Minecart::bounds)
+            .filter(|b| b.intersects(area))
+            .collect();
+        Some(NearCarts { area, boxes })
     }
     /// The slots of the mobs whose box may meet `area` into `out`, and
     /// whether a mob rides cart `cart`; None: scan them all.

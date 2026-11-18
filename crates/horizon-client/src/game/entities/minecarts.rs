@@ -41,6 +41,7 @@ mod block_effects;
 mod cells;
 #[path = "minecarts/hit.rs"]
 mod hit;
+#[cfg(test)]
 #[path = "minecarts/near_carts.rs"]
 mod near_carts;
 pub(super) use hit::CartHit;
@@ -860,9 +861,15 @@ impl Game<'_> {
         slot: usize,
         index: &mut CartIndex,
     ) -> bool {
-        let reach = near_carts::NEAR_CARTS_REACH;
-        let area = c.bounds().inflate(Vec3::new(reach, reach, reach));
-        c.near_carts = index.near_snapshot(&self.carts, slot, area).map(Box::new);
+        #[cfg(not(test))]
+        let cache_enabled = true;
+        #[cfg(test)]
+        let cache_enabled = !near_carts::tests_support::NEAR_CARTS_OFF.get();
+        if cache_enabled {
+            let reach = NEAR_CARTS_REACH;
+            let area = c.bounds().inflate(Vec3::new(reach, reach, reach));
+            c.near_carts = index.near_snapshot(&self.carts, slot, area).map(Box::new);
+        }
 
         c.tick_count += 1;
         c.previous = c.position;

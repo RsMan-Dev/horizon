@@ -83,7 +83,6 @@ impl CartCells {
 
 #[cfg(test)]
 mod tests {
-    use super::super::near_carts::NEAR_CARTS_REACH;
     use super::*;
     use horizon_core::geometry::Vec3;
 
