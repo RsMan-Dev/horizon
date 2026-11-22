@@ -258,7 +258,7 @@ impl Game<'_> {
 
     /// Player.tick's statistics and ServerPlayer.tick's triggers, then
     /// PlayerAdvancements.flushDirty, with the guest's state swapped in.
-    fn guest_tick_tail(
+    pub(super) fn guest_tick_tail(
         &mut self,
         sleeping: bool,
         recorded: &mut crate::game::scoreboard::Recorded,
