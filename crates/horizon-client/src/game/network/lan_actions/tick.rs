@@ -213,15 +213,14 @@ impl Game<'_> {
             let Some(host) = self.lan.as_mut() else {
                 return;
             };
-            let mut recorded =
-                std::mem::take(&mut host.play.entry(conn).or_default().score_recorded);
-            let ran = self.guest_server_tick_with_tail(
-                conn,
-                Some(&mut |game| {
-                    let sleeping = game.sleeping.is_some();
-                    game.guest_tick_tail(sleeping, &mut recorded);
-                }),
-            );
+            let recorded = std::mem::take(&mut host.play.entry(conn).or_default().score_recorded);
+            super::guest_body::MERGED_TAIL.set(Some(super::guest_body::MergedTail {
+                recorded,
+                ran: false,
+            }));
+            self.guest_server_tick(conn);
+            let super::guest_body::MergedTail { mut recorded, ran } =
+                super::guest_body::MERGED_TAIL.take().unwrap_or_default();
             if !ran {
                 let Some(host) = self.lan.as_mut() else {
                     return;

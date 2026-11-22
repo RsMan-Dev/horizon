@@ -51,6 +51,20 @@ pub(super) fn initialize(resources: &MotionResources, guest: &mut Guest) -> bool
     true
 }
 
+/// The rest of a guest's tick, handed to `guest_server_tick` by its caller so that the mod point
+/// stays the one entry of the guest's body: `recorded` is the scoreboard record the tail updates,
+/// `ran` says whether the body's turn ran the tail (the caller runs it in a turn of its own if not).
+#[derive(Default)]
+pub(super) struct MergedTail {
+    pub(super) recorded: crate::game::scoreboard::Recorded,
+    pub(super) ran: bool,
+}
+
+thread_local! {
+    pub(super) static MERGED_TAIL: std::cell::RefCell<Option<MergedTail>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 impl Game<'_> {
     /// The guest's body on the server each tick: ServerPlayer.tick's damage
     /// clock and Entity.baseTick's fluid phase (burning), then for each move
@@ -61,29 +75,7 @@ impl Game<'_> {
     /// hazards (drowning, lava, fire blocks, suffocation, the void), and
     /// regeneration and the food tick (ServerPlayer.doTick). Their hurt
     /// sounds are heard at the guest.
-    #[allow(dead_code)] // Retained as a native mod point.
     pub(super) fn guest_server_tick(&mut self, conn: u32) {
-        self.guest_server_tick_with_tail(conn, None);
-    }
-
-    pub(super) fn guest_server_tick_with_tail(
-        &mut self,
-        conn: u32,
-        tail: Option<&mut dyn FnMut(&mut Self)>,
-    ) -> bool {
-        let mut ran = false;
-        self.guest_server_tick_inner(conn, tail, &mut ran);
-        ran
-    }
-
-    /// `ran` says whether `tail` (the rest of the guest's tick, which
-    /// the caller would run in a turn of its own) ran in this tick's turn.
-    fn guest_server_tick_inner(
-        &mut self,
-        conn: u32,
-        tail: Option<&mut dyn FnMut(&mut Self)>,
-        ran: &mut bool,
-    ) {
         self.guest_replay(conn);
         self.guest_vehicle_tick(conn);
         // The last move's fall stands in for the server's delta movement.
@@ -385,7 +377,7 @@ impl Game<'_> {
             #[cfg(not(test))]
             let allowed = true;
             if allowed
-                && let Some(tail) = tail
+                && MERGED_TAIL.with_borrow(Option::is_some)
                 && gate(40, events.iter().all(inert))
                 && gate(41, velocity.is_none())
                 && gate(42, soul.is_none())
@@ -409,9 +401,19 @@ impl Game<'_> {
                     game.stat_criteria_changed(&name, stats);
                 }
                 if !no_tail {
-                    tail(game);
+                    let sleeping = game.sleeping.is_some();
+                    // Out of the cell while it runs, as it may reach hooks of the mods.
+                    if let Some(mut tail) = MERGED_TAIL.take() {
+                        game.guest_tick_tail(sleeping, &mut tail.recorded);
+                        MERGED_TAIL.set(Some(tail));
+                    }
                 }
                 merged = true;
+                MERGED_TAIL.with_borrow_mut(|tail| {
+                    if let Some(tail) = tail {
+                        tail.ran = true;
+                    }
+                });
             }
             (events, velocity)
         });
@@ -420,7 +422,6 @@ impl Game<'_> {
         };
         #[cfg(test)]
         TRACE.with_borrow_mut(|trace| trace.push((conn, merged)));
-        *ran = merged;
         if let Some((at, velocity)) = soul
             && let Some(host) = self.lan.as_ref()
         {
