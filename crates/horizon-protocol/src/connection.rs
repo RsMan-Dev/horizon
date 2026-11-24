@@ -726,7 +726,8 @@ impl ConnWriter {
     /// [`Self::frame_into`] of what `frame::contents` makes of a body shorter than the
     /// compression threshold (a zero for the uncompressed size, then the body), written at
     /// once: no vector of its own, one copy of the body instead of two. The caller checked
-    /// the threshold (`Framing::Network(Some(t))`, `body.len() < t`).
+    /// the threshold (`Framing::Network(Some(t))`, `body.len() < t`) and that the body is shorter
+    /// than `frame::MAX_FRAME`, which `contents` refuses.
     pub fn frame_small_into(&mut self, body: &[u8], out: &mut Vec<u8>) {
         let written = self.frame_small_uncounted(body, out);
         self.count_frames(1, written);
@@ -735,7 +736,11 @@ impl ConnWriter {
     /// caller adds up what it framed and gives it to [`Self::count_frames`] once.
     pub fn frame_small_uncounted(&mut self, body: &[u8], out: &mut Vec<u8>) -> i64 {
         let at = out.len();
-        debug_assert!(!self.memory && self.threshold.is_some_and(|t| body.len() < t));
+        debug_assert!(
+            !self.memory
+                && self.threshold.is_some_and(|t| body.len() < t)
+                && body.len() < crate::frame::MAX_FRAME
+        );
         // The frame's length (the uncompressed-size zero and the body), a VarInt, and the
         // zero: written from the stack, with one check of the buffer's room.
         let (mut head, mut n, mut v) = ([0u8; 6], 0, body.len() as u32 + 1);
@@ -890,9 +895,15 @@ mod tests {
         time("in place (frame_small_into)", &mut |w, out| {
             w.frame_small_into(&body, out);
         });
+        // Counted once for each run of 256 frames, as `frame_drain` does.
+        let mut tally = (0, 0);
         time("in place, counted once a run", &mut |w, out| {
-            let bytes = w.frame_small_uncounted(&body, out);
-            w.count_frames(1, bytes);
+            tally.1 += w.frame_small_uncounted(&body, out);
+            tally.0 += 1;
+            if tally.0 == 256 {
+                w.count_frames(tally.0, tally.1);
+                tally = (0, 0);
+            }
         });
     }
 
